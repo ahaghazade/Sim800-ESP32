@@ -1,0 +1,3 @@
+[submodule "lib/lib/sim800_cdrv"]
+	path = lib/lib/sim800_cdrv
+	url = https://github.com/ahaghazade/Sim800_cdrv.git
