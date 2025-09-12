@@ -21,15 +21,20 @@
 #include "Sim800_cdrv.h"
 
 #include <SPIFFS.h>
+#include <Arduino.h>
 
 /* Private define ------------------------------------------------------------*/
 /* Private macro -------------------------------------------------------------*/
 /* Private typedef -----------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
+const char* SavedPhoneNumbersPath = "/PhoneNumbers.json";
+
 /* Private function prototypes -----------------------------------------------*/
-static sim800_res_t fSaveJson(JsonDocument *JsonDoc, String path);
-static sim800_res_t fLoadJson(JsonDocument *JsonDoc, String path);
-static String fNormalizedPhoneNum(String PhoneNum);
+static sim800_res_t fLoadPhoneNumbers(JsonDocument *JsonDoc, String path);
+static sim800_res_t fSavePhoneNumbers(JsonDocument *JsonDoc, String path);
+static sim800_res_t fNormalizedPhoneNumber(String PhoneNumber, String *Normalized);
+static sim800_res_t fReadInbox();
+static sim800_res_t fClearInbox();
 
 /* Variables -----------------------------------------------------------------*/
 
@@ -45,26 +50,31 @@ static String fNormalizedPhoneNum(String PhoneNum);
  */
 sim800_res_t fSim800_Init(sSim800 * const me) {
 
-    if(me == NULL || me->SavePhoneNumbersPath.isEmpty()) {
-        return SIM800_RES_INIT_FAIL;
-    }
+  if(me == NULL) {
+    return SIM800_RES_INIT_FAIL;
+  }
 
-    me->Init = false;
+  me->Init = false;
 
-    fLoadJson(&me->SavedPhoneNumbers, me->SavePhoneNumbersPath);
+  if (!SPIFFS.begin(true)) { 
+    return SIM800_RES_INIT_FAIL;
+  }
 
+  if(fLoadPhoneNumbers(&me->SavedPhoneNumbers, SavedPhoneNumbersPath) != SIM800_RES_OK) {
+    return SIM800_RES_INIT_FAIL;
+  }
 
-    me->Enable = true;
-    me->Init = true;
+  me->EnableSengingSMS = true;
+  me->Init = true;
 
-    return SIM800_RES_OK;
+  return SIM800_RES_OK;
 }
 
 void fSim800_Run(sSim800 * const me) {
 
-    if (me == NULL || !me->Init) {
-        return;
-    }
+  if (me == NULL || !me->Init) {
+    return;
+  }
 
 }
 
@@ -78,6 +88,19 @@ void fSim800_Run(sSim800 * const me) {
  */
 sim800_res_t fSim800_AddPhoneNumber(sSim800 * const me, String PhoneNumber, bool IsAdmin) {
 
+  if(me == NULL || !me->Init) {
+    return SIM800_RES_INIT_FAIL;
+  }
+
+  String NormalizedPhoneNumber;
+  if(fNormalizedPhoneNumber(PhoneNumber, &NormalizedPhoneNumber) != SIM800_RES_OK) {
+    return SIM800_RES_PHONENUMBER_INVALID;
+  }
+
+  me->SavedPhoneNumbers[NormalizedPhoneNumber] = IsAdmin? 1 : 0;
+  fSavePhoneNumbers(&me->SavedPhoneNumbers, SavedPhoneNumbersPath);
+
+  return SIM800_RES_OK;
 }
 
 /**
@@ -89,6 +112,39 @@ sim800_res_t fSim800_AddPhoneNumber(sSim800 * const me, String PhoneNumber, bool
  */
 sim800_res_t fSim800_RemovePhoneNumber(sSim800 * const me, String PhoneNumber) {
 
+  if (me == NULL || !me->Init) {
+    return SIM800_RES_INIT_FAIL;
+  }
+
+  String NormalizedPhoneNumber;
+  if (fNormalizedPhoneNumber(PhoneNumber, &NormalizedPhoneNumber) != SIM800_RES_OK) {
+    return SIM800_RES_PHONENUMBER_INVALID;
+  }
+
+  if (!me->SavedPhoneNumbers.containsKey(NormalizedPhoneNumber)) {
+    return SIM800_RES_PHONENUMBER_NOT_FOUND;
+  }
+
+  me->SavedPhoneNumbers.remove(NormalizedPhoneNumber);
+  fSavePhoneNumbers(&me->SavedPhoneNumbers, SavedPhoneNumbersPath);
+
+  return SIM800_RES_OK;
+}
+
+/**
+ * @brief 
+ * 
+ * @param me 
+ * @param PhoneNumber 
+ * @return sim800_res_t 
+ */
+sim800_res_t fSim800_RemoveAllPhoneNumbers(sSim800 * const me, String PhoneNumber) {
+
+  if(me == NULL || !me->Init) {
+    return SIM800_RES_INIT_FAIL;
+  }
+
+  return SIM800_RES_OK;
 }
 
 /**
@@ -102,6 +158,7 @@ sim800_res_t fSim800_RemovePhoneNumber(sSim800 * const me, String PhoneNumber) {
  */
 sim800_res_t fSim800_SendSMS(sSim800 * const me, String PhoneNumber, String Text, bool DeliveryCheck) {
 
+	return SIM800_RES_OK;
 }
 
 /**
@@ -114,6 +171,8 @@ sim800_res_t fSim800_SendSMS(sSim800 * const me, String PhoneNumber, String Text
  */
 sim800_res_t fSim800_SendCommand(sSim800 * const me, String Command, String DesiredResponse) {
 
+
+	return SIM800_RES_OK;
 }
 
 
@@ -128,14 +187,17 @@ sim800_res_t fSim800_SendCommand(sSim800 * const me, String Command, String Desi
  * @param path 
  * @return sim800_res_t 
  */
-static sim800_res_t fSaveJson(JsonDocument *JsonDoc, String path) {
+static sim800_res_t fSavePhoneNumbers(JsonDocument *JsonDoc, String path) {
 
-    File file = SPIFFS.open(path, FILE_WRITE);
-    if (!file) {
-        return SIM800_RES_LOAD_JSON_FIAL;
-    }
-    serializeJson(*JsonDoc, file);
-    file.close();
+  File file = SPIFFS.open(path, FILE_WRITE);
+  if(!file) {
+    return SIM800_RES_LOAD_JSON_FIAL;
+  }
+
+  serializeJson(*JsonDoc, file);
+  file.close();
+
+  return SIM800_RES_OK;
 }
 
 /**
@@ -145,16 +207,16 @@ static sim800_res_t fSaveJson(JsonDocument *JsonDoc, String path) {
  * @param path 
  * @return sim800_res_t 
  */
-static sim800_res_t fLoadJson(JsonDocument *JsonDoc, String path) {
+static sim800_res_t fLoadPhoneNumbers(JsonDocument *JsonDoc, String path) {
 
-    File file = SPIFFS.open(path, FILE_READ);
-    if (!file) {
-        return SIM800_RES_LOAD_JSON_FIAL;
-    }
-    deserializeJson(*JsonDoc, file);
-    file.close();
+  File file = SPIFFS.open(path, FILE_READ);
+  if(!file) {
+    return SIM800_RES_LOAD_JSON_FIAL;
+  }
+  deserializeJson(*JsonDoc, file);
+  file.close();
 
-    return SIM800_RES_OK;
+  return SIM800_RES_OK;
 }
 
 /**
@@ -163,18 +225,18 @@ static sim800_res_t fLoadJson(JsonDocument *JsonDoc, String path) {
  * @param PhoneNum 
  * @return String 
  */
-static String fNormalizedPhoneNum(String PhoneNum) {
+static sim800_res_t fNormalizedPhoneNumber(String PhoneNumber, String *Normalized) {
 
-  String Normalized = "";
-
-  if (PhoneNum.length() == 11 && PhoneNum.startsWith("0")) {
-    Normalized = "+98" + PhoneNum.substring(1);
+  if(PhoneNumber.length() == 11 && PhoneNumber.startsWith("0")) {
+    *Normalized = PhoneNumber;
   } 
-  else if (PhoneNum.length() == 13 && PhoneNum.startsWith("+")) {
-    Normalized = PhoneNum;
+  else if(PhoneNumber.length() == 13 && PhoneNumber.startsWith("+")) {
+    *Normalized = "0" + PhoneNumber.substring(3);
+  } else {
+    return SIM800_RES_PHONENUMBER_INVALID;
   }
 
-  return Normalized;
+  return SIM800_RES_OK;
 }
 
 

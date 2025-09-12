@@ -24,8 +24,6 @@
 #define CDRV_SIM800_H
 
 /* Includes ------------------------------------------------------------------*/
-#include <Arduino.h>
-
 #include <ArduinoJson.h>
 
 #ifdef __cplusplus
@@ -45,6 +43,8 @@ typedef uint8_t sim800_res_t;
 #define SIM800_RES_SEND_SMS_FAIL                ((uint8_t)4)
 #define SIM800_RES_SAVE_JSON_FAIL               ((uint8_t)5)
 #define SIM800_RES_LOAD_JSON_FIAL               ((uint8_t)6)
+#define SIM800_RES_PHONENUMBER_INVALID          ((uint8_t)7)
+#define SIM800_RES_PHONENUMBER_NOT_FOUND        ((uint8_t)8)
 
 /* Exported macro ------------------------------------------------------------*/
 /* Exported types ------------------------------------------------------------*/
@@ -56,14 +56,11 @@ typedef struct {
 
     bool Init;
 
-    bool Enable;
+    bool EnableSengingSMS;
 
     JsonDocument SavedPhoneNumbers;
 
-    String SavePhoneNumbersPath;
-
-    size_t(*fpSend)(String Data);
-
+    Stream* Serial;
 
 }sSim800;
 
@@ -73,6 +70,7 @@ sim800_res_t fSim800_Init(sSim800 * const me);
 void fSim800_Run(sSim800 * const me);
 sim800_res_t fSim800_AddPhoneNumber(sSim800 * const me, String PhoneNumber, bool IsAdmin);
 sim800_res_t fSim800_RemovePhoneNumber(sSim800 * const me, String PhoneNumber);
+sim800_res_t fSim800_RemoveAllPhoneNumbers(sSim800 * const me, String PhoneNumber);
 sim800_res_t fSim800_SendSMS(sSim800 * const me, String PhoneNumber, String Text, bool DeliveryCheck);
 sim800_res_t fSim800_SendCommand(sSim800 * const me, String Command, String DesiredResponse);
 
@@ -82,6 +80,6 @@ sim800_res_t fSim800_SendCommand(sSim800 * const me, String Command, String Desi
 }
 #endif
 
-#endif /* CDRV_WS2812_H */
+#endif /* CDRV_SIM800_H */
 
 /************************ © COPYRIGHT DiodeGroup *****END OF FILE****/
