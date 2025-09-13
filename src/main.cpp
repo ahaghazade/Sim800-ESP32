@@ -106,6 +106,7 @@ static void fSim800_CommandHandler(void *sender, sSim800RecievedMassgeDone *pArg
     case 1: {
 
       fCommand_lampAct(pArgs->MassageData.Massage);
+      fSim800_SendSMS(&Sim800, "09127176496", "Lamp Command Done");
 
       break;
     }
