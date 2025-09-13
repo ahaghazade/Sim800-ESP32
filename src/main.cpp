@@ -1,42 +1,135 @@
+/**
+ ******************************************************************************
+ * @file           : main.c
+ * @brief          :
+ ******************************************************************************
+ * @attention
+ *
+ * Copyright (c) 2025 DiodeGroup.
+ * All rights reserved.
+ *
+ * This software is licensed under terms that can be found in the LICENSE file
+ * in the root directory of this software component
+ *
+ *
+ ******************************************************************************
+ * @verbatim
+ * @endverbatim
+ */
+
+/* Includes ------------------------------------------------------------------*/
 #include <Arduino.h>
 
 #include "Sim800_cdrv.h"
 
-
+/* Private define ------------------------------------------------------------*/
 #define RX2D2 16
 #define TX2D2 17
 
+#define RELAY_PIN 5
+/* Private macro -------------------------------------------------------------*/
+/* Private typedef -----------------------------------------------------------*/
+/* Private variables ---------------------------------------------------------*/
 sSim800 Sim800;
 
+/* Private function prototypes -----------------------------------------------*/
+static void fSim800_CommandHandler(void *sender, sSim800RecievedMassgeDone *pArgs);
+static void fCommand_lampAct(const String receivedMessage);
+/* Variables -----------------------------------------------------------------*/
 
+/*
+╔═════════════════════════════════════════════════════════════════════════════════╗
+║                          ##### SETUP #####                                      ║
+╚═════════════════════════════════════════════════════════════════════════════════╝*/
 void setup() {
 
   Serial.begin(115200);
   Serial2.begin(9600, SERIAL_8N1, RX2D2, TX2D2);
 
+  pinMode(RELAY_PIN, OUTPUT);
+  digitalWrite(RELAY_PIN, LOW);
+
   Sim800.ComPort = &Serial2;
   Sim800.CommandSendRetries = 3;
   Sim800.EnableDeliveryReport = true;
 
-  Serial.print("init sim800 : ");
-  Serial.println(fSim800_Init(&Sim800));
+  
+  if(fSim800_Init(&Sim800) != SIM800_RES_OK) {
+    while(1);
+  }
+
+  if(fSim800_RegisterCommandEvent(&Sim800, fSim800_CommandHandler) != SIM800_RES_OK) {
+    while(1);
+  }
+
+  Serial.println("Sim800 initial success");
 
   fSim800_AddPhoneNumber(&Sim800, "09127176496", 1);
-  fSim800_AddPhoneNumber(&Sim800, "+989024674437", 0);
 
   Serial.println("Saved phone numbers:");
   serializeJsonPretty(Sim800.SavedPhoneNumbers, Serial);
-
-  // Serial.print("\nsend sms result: ");
-  // Serial.println(fSim800_SendSMS(&Sim800, "09127176496", "1Helloooo"));
-  // Serial.println(fSim800_SendSMS(&Sim800, "09127176496", "2Helloooo"));
-
-  Serial.println("-------");
-
+  Serial.println();
 }
+
+/*
+╔═════════════════════════════════════════════════════════════════════════════════╗
+║                          ##### LOOP #####                                       ║
+╚═════════════════════════════════════════════════════════════════════════════════╝*/
 
 void loop() {
 
   fSim800_Run(&Sim800);
   delay(5000);
+}
+
+/*
+╔═════════════════════════════════════════════════════════════════════════════════╗
+║                            ##### Private Functions #####                        ║
+╚═════════════════════════════════════════════════════════════════════════════════╝*/
+/**
+ * @brief 
+ * 
+ * @param sender 
+ * @param pArgs 
+ */
+static void fSim800_CommandHandler(void *sender, sSim800RecievedMassgeDone *pArgs) {
+
+
+  Serial.printf("Command recived from %s, and command %d\n", pArgs->MassageData.phoneNumber, pArgs->CommandType);
+  
+  switch(pArgs->CommandType) {
+
+    case 0: {
+      break;
+    }
+
+    case 1: {
+
+      fCommand_lampAct(pArgs->MassageData.Massage);
+
+      break;
+    }
+
+    default: {
+      break;
+    }
+  }
+}
+
+/**
+ * @brief 
+ * 
+ * @param receivedMessage 
+ */
+static void fCommand_lampAct(const String receivedMessage) {
+
+  if (receivedMessage.indexOf(OFF) != -1) {
+    Serial.println("Turning off lamp...");
+    digitalWrite(RELAY_PIN, LOW);
+
+  } else if(receivedMessage.indexOf(ON) != -1) {
+
+    Serial.println("Turning on lamp!");
+    digitalWrite(RELAY_PIN, HIGH);
+  }
 }
