@@ -21,6 +21,7 @@
 #include <Arduino.h>
 
 #include "Sim800_cdrv.h"
+#include <soc/rtc_cntl_reg.h>
 
 /* Private define ------------------------------------------------------------*/
 #define RX2D2 16
@@ -45,6 +46,8 @@ void setup() {
 
   Serial.begin(115200);
   Serial2.begin(9600, SERIAL_8N1, RX2D2, TX2D2);
+  Serial.println("Power on");
+  WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
 
   pinMode(RELAY_PIN, OUTPUT);
   digitalWrite(RELAY_PIN, LOW);
@@ -57,6 +60,8 @@ void setup() {
   if(fSim800_Init(&Sim800) != SIM800_RES_OK) {
     while(1);
   }
+
+  Serial.println("Sim800 initial success");
 
   if(fSim800_RegisterCommandEvent(&Sim800, fSim800_CommandHandler) != SIM800_RES_OK) {
     while(1);
@@ -79,7 +84,7 @@ void setup() {
 void loop() {
 
   fSim800_Run(&Sim800);
-  delay(5000);
+  delay(2000);
 }
 
 /*
@@ -99,14 +104,14 @@ static void fSim800_CommandHandler(void *sender, sSim800RecievedMassgeDone *pArg
   
   switch(pArgs->CommandType) {
 
-    case 0: {
+    case eSYSTEM_COMMAND: {
       break;
     }
 
-    case 1: {
+    case eLAMP_COMMAND: {
 
       fCommand_lampAct(pArgs->MassageData.Massage);
-      fSim800_SendSMS(&Sim800, "09127176496", "Lamp Command Done");
+      // fSim800_SendSMS(&Sim800, "09127176496", "Lamp Command Done");
 
       break;
     }
