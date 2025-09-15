@@ -70,6 +70,7 @@ void setup() {
   Serial.println("Sim800 initial success");
 
   fSim800_AddPhoneNumber(&Sim800, "09127176496", 1);
+  fSim800_AddPhoneNumber(&Sim800, "09024674437", 0);
 
   Serial.println("Saved phone numbers:");
   serializeJsonPretty(Sim800.SavedPhoneNumbers, Serial);
@@ -111,8 +112,6 @@ static void fSim800_CommandHandler(void *sender, sSim800RecievedMassgeDone *pArg
     case eLAMP_COMMAND: {
 
       fCommand_lampAct(pArgs->MassageData.Massage);
-      // fSim800_SendSMS(&Sim800, "09127176496", "Lamp Command Done");
-
       break;
     }
 
@@ -132,10 +131,12 @@ static void fCommand_lampAct(const String receivedMessage) {
   if (receivedMessage.indexOf(OFF) != -1) {
     Serial.println("Turning off lamp...");
     digitalWrite(RELAY_PIN, LOW);
+    fSim800_SMSSendToAll(&Sim800, LAMPOFF);
 
   } else if(receivedMessage.indexOf(ON) != -1) {
 
     Serial.println("Turning on lamp!");
     digitalWrite(RELAY_PIN, HIGH);
+    fSim800_SMSSendToAll(&Sim800, LAMPON);
   }
 }
