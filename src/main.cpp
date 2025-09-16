@@ -131,12 +131,14 @@ static void fCommand_lampAct(const String receivedMessage) {
   if (receivedMessage.indexOf(OFF) != -1) {
     Serial.println("Turning off lamp...");
     digitalWrite(RELAY_PIN, LOW);
-    fSim800_SMSSendToAll(&Sim800, LAMPOFF);
+    // fSim800_SMSSendToAll(&Sim800, LAMPOFF);
+    fSim800_SMSSend(&Sim800, "09024674437" ,LAMPOFF);
 
   } else if(receivedMessage.indexOf(ON) != -1) {
 
     Serial.println("Turning on lamp!");
     digitalWrite(RELAY_PIN, HIGH);
-    fSim800_SMSSendToAll(&Sim800, LAMPON);
+    // fSim800_SMSSendToAll(&Ssim800, LAMPON);
+    fSim800_SMSSend(&Sim800, "09024674437" ,LAMPON);
   }
 }
