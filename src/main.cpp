@@ -31,11 +31,10 @@
 /* Private macro -------------------------------------------------------------*/
 /* Private typedef -----------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
-sSim800 Sim800;
-
 /* Private function prototypes -----------------------------------------------*/
-static void fSim800_CommandHandler(void *sender, sSim800RecievedMassgeDone *pArgs);
+static void fSim800_CommandHandler(sSim800RecievedMassgeDone *pArgs);
 static void fCommand_lampAct(const String receivedMessage);
+
 /* Variables -----------------------------------------------------------------*/
 
 /*
@@ -57,20 +56,20 @@ void setup() {
   Sim800.EnableDeliveryReport = true;
 
   
-  if(fSim800_Init(&Sim800) != SIM800_RES_OK) {
+  if(fSim800_Init() != SIM800_RES_OK) {
     while(1);
   }
 
   Serial.println("Sim800 initial success");
 
-  if(fSim800_RegisterCommandEvent(&Sim800, fSim800_CommandHandler) != SIM800_RES_OK) {
+  if(fSim800_RegisterCommandEvent(fSim800_CommandHandler) != SIM800_RES_OK) {
     while(1);
   }
 
   Serial.println("Sim800 initial success");
 
-  fSim800_AddPhoneNumber(&Sim800, "09127176496", 1);
-  fSim800_AddPhoneNumber(&Sim800, "09024674437", 0);
+  fSim800_AddPhoneNumber("09127176496", 1);
+  fSim800_AddPhoneNumber("09024674437", 0);
 
   Serial.println("Saved phone numbers:");
   serializeJsonPretty(Sim800.SavedPhoneNumbers, Serial);
@@ -84,7 +83,7 @@ void setup() {
 
 void loop() {
 
-  fSim800_Run(&Sim800);
+  fSim800_Run();
   delay(2000);
 }
 
@@ -98,7 +97,7 @@ void loop() {
  * @param sender 
  * @param pArgs 
  */
-static void fSim800_CommandHandler(void *sender, sSim800RecievedMassgeDone *pArgs) {
+static void fSim800_CommandHandler(sSim800RecievedMassgeDone *pArgs) {
 
 
   Serial.printf("Command recived from %s, and command %d\n", pArgs->MassageData.phoneNumber, pArgs->CommandType);
@@ -131,14 +130,14 @@ static void fCommand_lampAct(const String receivedMessage) {
   if (receivedMessage.indexOf(OFF) != -1) {
     Serial.println("Turning off lamp...");
     digitalWrite(RELAY_PIN, LOW);
-    // fSim800_SMSSendToAll(&Sim800, LAMPOFF);
-    fSim800_SMSSend(&Sim800, "09024674437" ,LAMPOFF);
+    // fSim800_SMSSendToAll(LAMPOFF);
+    fSim800_SMSSend("09024674437" ,LAMPOFF);
 
   } else if(receivedMessage.indexOf(ON) != -1) {
 
     Serial.println("Turning on lamp!");
     digitalWrite(RELAY_PIN, HIGH);
     // fSim800_SMSSendToAll(&Ssim800, LAMPON);
-    fSim800_SMSSend(&Sim800, "09024674437" ,LAMPON);
+    fSim800_SMSSend("09024674437" ,LAMPON);
   }
 }
