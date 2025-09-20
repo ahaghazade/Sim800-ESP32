@@ -74,6 +74,8 @@ void setup() {
   Serial.println("Saved phone numbers:");
   serializeJsonPretty(Sim800.SavedPhoneNumbers, Serial);
   Serial.println();
+
+  fSim800_SMSSendToAll(STARTUP_MSG);
 }
 
 /*
@@ -130,8 +132,8 @@ static void fCommand_lampAct(const String receivedMessage) {
   if (receivedMessage.indexOf(OFF) != -1) {
     Serial.println("Turning off lamp...");
     digitalWrite(RELAY_PIN, LOW);
-    // fSim800_SMSSendToAll(LAMPOFF);
-    fSim800_SMSSend("09024674437" ,LAMPOFF);
+    fSim800_SMSSendToAll(LAMPOFF);
+    // fSim800_SMSSend("09024674437" ,LAMPOFF);
 
   } else if(receivedMessage.indexOf(ON) != -1) {
 
