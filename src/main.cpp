@@ -60,15 +60,13 @@ void setup() {
     while(1);
   }
 
-  Serial.println("Sim800 initial success");
-
   if(fSim800_RegisterCommandEvent(fSim800_CommandHandler) != SIM800_RES_OK) {
     while(1);
   }
 
   Serial.println("Sim800 initial success");
 
-  fSim800_AddPhoneNumber("09127176496", 1);
+  fSim800_RemovePhoneNumber("09127176496");
   fSim800_AddPhoneNumber("09024674437", 0);
 
   Serial.println("Saved phone numbers:");
