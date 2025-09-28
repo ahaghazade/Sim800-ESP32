@@ -57,11 +57,11 @@ void setup() {
 
   
   if(fSim800_Init() != SIM800_RES_OK) {
-    while(1);
+    ESP.restart();
   }
 
   if(fSim800_RegisterCommandEvent(fSim800_CommandHandler) != SIM800_RES_OK) {
-    while(1);
+    ESP.restart();
   }
 
   Serial.println("Sim800 initial success");
