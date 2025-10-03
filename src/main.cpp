@@ -28,6 +28,7 @@
 #define TX2D2 17
 
 #define RELAY_PIN 5
+
 /* Private macro -------------------------------------------------------------*/
 /* Private typedef -----------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
@@ -65,6 +66,7 @@ void setup() {
   }
 
   Serial.println("Sim800 initial success");
+  Sim800.Init = true;
 
   fSim800_RemovePhoneNumber("09127176496");
   fSim800_AddPhoneNumber("09024674437", 0);
@@ -73,7 +75,15 @@ void setup() {
   serializeJsonPretty(Sim800.SavedPhoneNumbers, Serial);
   Serial.println();
 
-  fSim800_SMSSendToAll(STARTUP_MSG);
+  JsonDocument PhoneList;
+  fSim800_GetPhoneNumbers(&PhoneList);
+  Serial.println("=======Get phone List===========");
+  serializeJsonPretty(PhoneList, Serial);
+  Serial.println();
+
+
+  // fSim800_SMSSendToAll(STARTUP_MSG);
+  fSim800_SMSSendToAll("Test massage");
 }
 
 /*
