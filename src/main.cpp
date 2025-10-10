@@ -45,7 +45,7 @@ static void fCommand_lampAct(const String receivedMessage);
 void setup() {
 
   Serial.begin(115200);
-  Serial2.begin(9600, SERIAL_8N1, RX2D2, TX2D2);
+  Serial2.begin(115200, SERIAL_8N1, RX2D2, TX2D2);
   Serial.println("Power on");
   WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
 
