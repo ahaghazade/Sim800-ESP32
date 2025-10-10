@@ -1,0 +1,203 @@
+body, html {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    font-family: 'Segoe UI', sans-serif;
+    overflow: hidden; /* Prevent scrolling caused by the pseudo-element */
+}
+
+body::before {
+    content: "";
+    position: fixed; /* Cover the whole screen */
+    left: 0;
+    right: 0;
+    z-index: -1; /* Ensure it's rendered behind the content */
+
+    display: block;
+    background-image: url('alarmhome.png'); /* Adjust path as necessary */
+    background-size: cover;
+    background-position: center;
+    width: 100%;
+    height: 100%;
+
+    /* Apply the blur effect */
+    filter: blur(5px);
+    -webkit-filter: blur(5px);
+}
+
+.header {
+    background-color: #91ffde;
+    color: #000000;
+    padding: 20px;
+    text-align: center;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+}
+
+.logo {
+    width: 50px;
+}
+
+.container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    padding: 20px;
+    justify-content: center;
+}
+
+.card {
+    background: rgba(255, 255, 255, 0.8); /* Semi-transparent for blur effect */
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    padding: 20px;
+    width: calc(33.333% - 20px);
+    box-sizing: border-box;
+}
+
+#save-phone {
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 25px;
+    cursor: pointer;
+    transition: background-color 0.3s, box-shadow 0.2s;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    font-weight: bold;
+    margin-top: 10px;
+    display: inline-block; /* Ensure alignment */
+}
+
+#save-phone:hover {
+    background-color: #45a049;
+}
+
+#delete-phone {
+    background-color: #c51010;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 25px;
+    cursor: pointer;
+    transition: background-color 0.3s, box-shadow 0.2s;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    font-weight: bold;
+    margin-top: 10px;
+    display: inline-block; 
+}
+
+#delete-phone:hover {
+    background-color: #45a049;
+}
+
+input[type="text"], select {
+    width: 100%;
+    padding: 10px;
+    margin-top: 10px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+    box-sizing: border-box;
+}
+
+.toggle-switch {
+    margin-top: 20px;
+}
+
+.switch-checkbox {
+    display: none;
+}
+
+.switch-label {
+    position: relative;
+    display: inline-block;
+    width: 60px;
+    height: 34px;
+}
+
+.switch-label .slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: .4s;
+    border-radius: 34px;
+}
+
+.switch-label .slider:before {
+    position: absolute;
+    content: "";
+    height: 26px;
+    width: 26px;
+    left: 4px;
+    bottom: 4px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+
+.switch-checkbox:checked + .switch-label .slider {
+    background-color: #4CAF50;
+}
+
+.switch-checkbox:checked + .switch-label .slider:before {
+    transform: translateX(26px);
+}
+
+.control-label {
+    display: inline-block;
+    margin-left: 75px; /* Adjust based on your layout */
+    vertical-align: super;
+}
+
+.sensor-card i {
+    margin-right: 8px;
+    color: #007bff; /* Adjust the color to match your theme */
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(2rem);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.header {
+    animation: fadeInUp 0.8s ease-out forwards;
+}
+
+.card, .sensor-card {
+    opacity: 0; /* Start elements as invisible */
+    animation: fadeInUp 0.8s ease-out forwards;
+}
+
+/* Individual animation for each card */
+.card:nth-of-type(1), .sensor-card:nth-of-type(1) {
+    animation-delay: 0.8s; /* Starts after the header animation */
+}
+
+.card:nth-of-type(2), .sensor-card:nth-of-type(2) {
+    animation-delay: 1.6s; /* Starts after the first card */
+}
+
+.card:nth-of-type(3), .sensor-card:nth-of-type(3) {
+    animation-delay: 2.4s; /* Starts after the second card */
+}
+
+/* Additional cards would continue the pattern */
+/* .card:nth-of-type(n), .sensor-card:nth-of-type(n) { animation-delay: Xs; } */
+
+.sensor-info h2, .sensor-info p {
+    /* This ensures the text inside cards doesn't start animating until the card's animation is almost complete. Adjust as necessary. */
+    animation: fadeInUp 0.8s ease-out forwards;
+    animation-delay: 3.2s;
+}

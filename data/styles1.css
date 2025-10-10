@@ -1,0 +1,378 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css');
+
+body {
+    font-family: 'Roboto', sans-serif;
+    background-color: #e0f7fa;
+    margin: 0;
+    padding: 0; /* Ensure no padding around the body */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh; /* Ensure minimum height covers the viewport */
+    color: #333;
+    overflow-x: hidden; /* Prevent horizontal scroll */
+}
+
+/* Container styling for mobile view */
+.container {
+    background-color: #ffffffcc;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    width: 90%;
+    max-width: 400px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center; /* Center align items */
+    text-align: center; /* Center align text */
+}
+
+/* Adjust heading for better mobile view */
+h1 {
+    font-size: 1.5em; /* Use relative units for better scaling */
+    margin-bottom: 20px;
+    color: #333;
+    text-align: center;
+    word-wrap: break-word; /* Ensure text wraps properly */
+}
+
+.status {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr); /* Two boxes per row */
+    gap: 10px; /* Space between boxes */
+    margin-bottom: 20px;
+}
+
+.item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 15px;
+    border-radius: 10px;
+    background-color: #f0f4f8;
+    text-align: center;
+    gap: 10px;
+}
+
+.item i {
+    font-size: 1.5em;
+    color: #007bff;
+}
+
+.icon {
+    width: 24px;
+    height: 24px;
+    filter: invert(48%) sepia(79%) saturate(2476%) hue-rotate(197deg) brightness(97%) contrast(97%);
+}
+.bicon {
+    width: 1rem;
+    height: 1rem;
+    filter: none;
+    display: block;
+}
+
+label {
+    font-weight: bold;
+    font-size: 0.9em;
+}
+
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 40px;
+    height: 20px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: .4s;
+    border-radius: 34px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 16px;
+    width: 16px;
+    left: 2px;
+    bottom: 2px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+
+input:checked + .slider {
+    background-color: #007bff;
+}
+
+input:checked + .slider:before {
+    transform: translateX(20px);
+}
+
+.controls {
+    display: flex;
+    justify-content: space-between; /* Distribute buttons to the edges */
+    width: 100%; /* Make sure it spans the full width of the container */
+    margin-top: 20px; /* Add some spacing above */
+}
+
+.icon-btn {
+    background: none;
+    border: none;
+    color: #007bff;
+    cursor: pointer;
+    /* font-size: 1.5em; */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%; /* Makes it a circle */
+    padding: 0; 
+    margin: 0; 
+}
+
+/* Optional: Adjust hover and active states */
+.icon-btn:active {
+    color: #00b395;
+}
+
+/* Make sure buttons are positioned correctly within the container */
+#log-btn {
+    justify-content: flex-start; /* Align log button to the left */
+}
+
+#design-btn {
+    justify-content: flex-end; /* Align design button to the right */
+}
+
+input[type="text"] {
+    padding: 10px;
+    width: 100%;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    margin-top: 5px;
+    font-size: 0.9em;
+}
+
+input[type="text"]:focus {
+    border-color: #007bff;
+}
+
+@media (max-width: 600px) {
+    .status {
+        grid-template-columns: repeat(2, 1fr); /* Keep two boxes per row on mobile */
+        gap: 10px; /* Maintain spacing */
+    }
+    
+    .container {
+        width: 95%; /* Adjust width for better fit on mobile */
+        padding: 15px; /* Adjust padding for better spacing */
+    }
+
+    h1 {
+        font-size: 1.2em; /* Slightly smaller font for better visibility */
+        margin-bottom: 15px; /* Adjust margin for spacing */
+    }
+}
+
+@media (min-width: 601px) {
+    .status {
+        grid-template-columns: repeat(2, 1fr); /* Ensure two boxes per row on larger screens as well */
+    }
+}
+
+/* Loading animation */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.loading-text {
+    animation: fadeIn 2s ease-in-out;
+}
+
+
+/* Slide-in animation for boxes */
+@keyframes slideInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Apply animation to each item with a delay */
+.status .item {
+    opacity: 0; /* Ensure items are initially hidden */
+    animation: slideInUp 0.8s ease-out forwards; /* Slide in effect */
+}
+
+.status .item:nth-child(1) {
+    animation-delay: 0.2s;
+}
+
+.status .item:nth-child(2) {
+    animation-delay: 0.4s;
+}
+
+.status .item:nth-child(3) {
+    animation-delay: 0.6s;
+}
+
+.status .item:nth-child(4) {
+    animation-delay: 0.8s;
+}
+
+.status .item:nth-child(5) {
+    animation-delay: 1s;
+}
+
+.status .item:nth-child(6) {
+    animation-delay: 1.2s;
+}
+
+.status .item:nth-child(7) {
+    animation-delay: 1.4s;
+}
+
+.status .item:nth-child(8) {
+    animation-delay: 1.6s;
+}
+
+.status .item:nth-child(9) {
+    animation-delay: 1.8s;
+}
+
+
+#temperature-gauge {
+    width : 8rem;
+    height: 8rem;
+    margin-top: 10  px;
+}
+
+#temperature-gauge {
+    width : 8rem;
+    height: 8rem;
+    margin-top: 10  px;
+}
+
+#humidity-gauge  {
+    width : 8rem;
+    height: 8rem;
+    margin-top: 10  px;
+}
+
+#set-time-btn {
+    width: 35px; /* Adjust width for circular appearance */
+    height: 35px; /* Adjust height for circular appearance */
+    border-radius: 50%; /* Makes the button circular */
+    background-color: #ccc; /* Blue color consistent with other icons */
+    color: #ffffff; /* White icon color */
+    border: none; /* Remove border */
+    display: flex; /* Align icon in the center */
+    align-items: center; /* Center icon vertically */
+    justify-content: center; /* Center icon horizontally */
+    margin-left: 5px; /* Space between text box and button */
+    cursor: pointer; /* Pointer cursor on hover */
+}
+
+/* Hover effect for the button */
+#set-time-btn:hover {
+    background-color: #4fb5c2; /* Darker blue on hover */
+}
+
+/* Align input and button horizontally */
+.item input[type="text"] {
+    margin-right: 5px; /* Margin between input and button */
+    flex-grow: 1; /* Allow input to grow to fill space */
+}
+
+
+/* Footer Styling */
+.container {
+    padding-bottom: 60px; /* Make sure to leave space at the bottom */
+}
+
+
+/* Footer Styling */
+.footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background-color:#7294a3cc; /* Change to white for modern app look */
+    padding: 5px 0;
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1); /* Slight shadow for floating effect */
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    z-index: 1000;
+}
+.footer-content {
+    display: flex;
+    justify-content: space-around;
+    width: 100%;
+    max-width: 400px;
+    margin: 0 auto;
+}
+
+.footer .icon-btn {
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+}
+
+.footer .logout-btn {
+    background: none;
+    border: none;
+    color: #e01a1a;
+    font-size: 1.5em;
+    cursor: pointer;
+} 
+
+
+/* Footer icons styling */
+.footer-content .icon-btn {
+    background: #ffffff; /* Light gray background for inactive state */
+    border: none;
+    /* color: rgb(0, 0, 0); Dark gray color for icons */
+    cursor: pointer;
+    border-radius: 50%; /* Circular button */
+    padding: 0.5rem;
+    transition: background-color 0.3s, box-shadow 0.3s, color 0.3s;
+    position: relative;
+    align-items: center;
+    justify-content: center;    
+}
+
+/* Selected or active icon styling */
+.footer-content .icon-btn.selected {
+    background-color: #2b8eff; /* Blue for active icon */
+    color: white;
+}
+.icon-btn.selected .bicon {
+    filter: brightness(0) invert(1); /* Turns black to white */
+}

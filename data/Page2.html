@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings</title>
+    <link rel="stylesheet" href="styles2.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Didomak Settings</h1>
+        <div class="settings">
+            <div class="row">
+                <div class="item">
+                    <img src="radar.png" alt="radar Icon", class="icon">
+                    <label for="radar-slider" id="radar-slider-value">Detection Distance (-)</label>
+                    <input type="range" id="radar-slider" min="1" max="9" oninput="updateSliderRadarValue(this.value)">
+                </div>
+                <div class="item">
+                    <img src="lamp.png" alt="lamp Icon", class="icon">
+                    <label for="rgb-slider" id="rgb-slider-value">RGB Brightness (-)</label>
+                    <input type="range" id="rgb-slider" min="0" max="100" oninput="updateSliderRGBValue(this.value)">
+                </div>
+            </div>
+            <div class="row">
+                <div class="item sensor">
+                    <!-- <i class="fas fa-thermometer-half"></i> -->
+                    <img src="temp.png" alt="temp Icon", class="icon">
+                    <label>Temp Sensor</label>
+                    <label class="switch">
+                        <input type="checkbox" id="temperature-toggle">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="item sensor">
+                    <!-- <i class="fas fa-water"></i> -->
+                    <img src="humidity.png" alt="humidity Icon", class="icon">
+                    <label>Humidity Sensor</label>
+                    <label class="switch">
+                        <input type="checkbox" id="humidity-toggle">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+            <div class="row">
+                <div class="item sensor">
+                    <!-- <i class="fas fa-fire"></i> -->
+                    <img src="fire.png" alt="fire Icon", class="icon">
+                    <label>Fire Sensor</label>
+                    <label class="switch">
+                        <input type="checkbox" id="fire-toggle">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="item sensor">
+                    <!-- <i class="fas fa-cloud"></i> -->
+                    <img src="cloud.png" alt="cloud Icon", class="icon">
+                    <label>CO Sensor</label>
+                    <label class="switch">
+                        <input type="checkbox" id="co-toggle">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+            <div class="row">
+                <div class="item">
+                    <!-- <i class="fas fa-clock"></i> -->
+                    <img src="clock.png" alt="clock Icon", class="icon">
+                    <label>Activation Delay</label>
+                    <input type="text" id="alarm-delay" placeholder="Time(S)">
+                </div>
+                <div class="item">
+                    <!-- <i class="fas fa-file-alt"></i> -->
+                    <img src="log.png" alt="log Icon", class="icon">
+                    <label>Log Count</label>
+                    <input type="text" id="log-count" placeholder="Enter Log count">
+                </div>
+            </div>
+            <div class="row">
+                <div class="item">
+                    <!-- <i class="fas fa-sim-card"></i> -->
+                    <img src="sim.png" alt="sim Icon", class="icon">
+                    <label>Credit Limit</label>
+                    <input type="text" id="credit-limit" placeholder="Enter Credit Limit">
+                </div>
+                <div class="item">
+                    <!-- <i class="fas fa-thermometer-half"></i> -->
+                    <img src="temp.png" alt="temp Icon", class="icon">
+                    <label>Temperature Limit</label>
+                    <input type="text" id="temp-limit" placeholder="Enter Temp Limit">
+                </div>
+            </div>
+            <div class="row">
+                <div class="item">
+                    <!-- <i class="fas fa-cloud"></i> -->
+                    <img src="cloud.png" alt="cloud Icon", class="icon">
+                    <label>Co Sensor Limit</label>
+                    <input type="text" id="co-limit" placeholder="Default Limit: 50">
+                </div>
+                <div class="item">
+                    <!-- <i class="fas fa-fire"></i> -->
+                    <img src="fire.png" alt="fire Icon", class="icon">
+                    <label>Fire Sensor Limit</label>
+                    <input type="text" id="fire-limit" placeholder="Default Limit: 50">
+                </div>
+            </div>
+            <div class="row">
+                <div class="item">
+                    <!-- <i class="fas fa-bell"></i> -->
+                    <img src="alarm.png" alt="alarm Icon", class="icon">
+                    <label>Alarm Duration</label>
+                    <input type="text" id="alarm-duration" placeholder="Default: 60(s)">
+                </div>
+                <div class="item">
+                    <!-- <i class="fa-solid fa-palette"></i> -->
+                    <img src="palette.png" alt="palette Icon", class="icon">
+                    <label>RGB Colors</label>
+                    
+                    <div class="color-selection">
+                        <div class="color-row">
+                            <span>System On</span>
+                            <button class="color-button" id="SystemOnButton" onclick="openColorPicker(event, 'SystemOn')">#FFFFFF</button>
+                            <input type="color" id="SystemOnPicker" style="display:none;" onchange="setColor(this.value, 'SystemOn')">
+                        </div>
+                        <div class="color-row">
+                            <span>System Off</span>
+                            <button class="color-button" id="SystemOffButton" onclick="openColorPicker(event, 'SystemOff')">#FFFFFF</button>
+                            <input type="color" id="SystemOffPicker" style="display:none;" onchange="setColor(this.value, 'SystemOff')">
+                        </div>
+                        <div class="color-row">
+                            <span>Alarm</span>
+                            <button class="color-button" id="AlarmButton" onclick="openColorPicker(event, 'Alarm')">#FFFFFF</button>
+                            <input type="color" id="AlarmPicker" style="display:none;" onchange="setColor(this.value, 'Alarm')">
+                        </div>
+                    </div>
+                    
+                </div>
+            </div>
+
+
+            <div class="item phone-numbers">
+                <div class="phone-header">
+                    <!-- <i class="fas fa-phone"></i> -->
+                    <img src="phone.png" alt="phone Icon", class="icon">
+                    <label>Phone Numbers</label>
+                </div>
+                <div class="phone-row">
+                    <input type="text" id="admin-phone-1" placeholder="Enter phone number">
+                    <input type="checkbox" id="admin-check-1">
+                    <label for="admin-check-1">Admin</label>
+                </div>
+                <div class="phone-row">
+                    <input type="text" id="admin-phone-2" placeholder="Enter phone number">
+                    <input type="checkbox" id="admin-check-2">
+                    <label for="admin-check-2">Admin</label>
+                </div>
+                <div class="phone-row">
+                    <input type="text" id="admin-phone-3" placeholder="Enter phone number">
+                    <input type="checkbox" id="admin-check-3">
+                    <label for="admin-check-3">Admin</label>
+                </div>
+                <div class="phone-row">
+                    <input type="text" id="admin-phone-4" placeholder="Enter phone number">
+                    <input type="checkbox" id="admin-check-4">
+                    <label for="admin-check-4">Admin</label>
+                </div>
+            </div>
+            <div class="item password">
+                <div class="password-header">
+                    <!-- <i class="fas fa-key"></i> -->
+                    <img src="key.png" alt="key Icon", class="icon">
+                    <label>Change Password</label>
+                </div>
+                <input type="password" id="new-password" placeholder="Enter new password">
+                <input type="password" id="confirm-password" placeholder="Confirm new password">
+            </div>
+        </div>
+        <div class="submit-button">
+            <button id="submit">Submit</button>
+        </div>
+
+        <footer class="footer">
+            <div class="footer-content">
+                <button class="icon-btn" id="log-btn"><img src="log.png" alt="log icon" class="bicon"></button>
+                <button class="icon-btn" id="clock-btn"><img src="clock.png" alt="clock icon" class="bicon"></button>
+                <button class="icon-btn" id="sensors-btn"><img src="home.png" alt="home icon" class="bicon"></button>
+                <button class="icon-btn selected" id="setting-btn"><img src="setting.png" alt="setting icon" class="bicon"></button>
+                <button class="icon-btn" id="logoutBtn"><img src="logout.png" alt="logout icon" class="bicon"></button>
+
+            </div>
+        </footer>
+    </div>
+    <script src="script2.js"></script>
+</body>
+</html>

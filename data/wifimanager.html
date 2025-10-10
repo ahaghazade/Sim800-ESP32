@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>DidomakConfig</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" type="text/css" href="wifi.css">
+</head>
+<body>  
+  <div class="topnav">
+    <h1>Didomak - Wifi Config</h1>
+  </div>
+  <div class="content">
+    <div class="card-grid">
+      <div class="card">
+        <form action="/config" method="POST">
+          <p>
+            <label for="ssid">SSID</label>
+            <input type="text" id ="ssid" name="ssid"><br>
+            <label for="pass">Password</label>
+            <input type="text" id ="pass" name="pass"><br>
+            <input type ="submit" value ="Submit">
+          </p>
+        </form>
+        <form action="/reset" method="GET">
+          <p>
+            <input type ="submit" value ="Reset">
+          </p>
+        </form>
+        <form action="/update" method="GET">
+          <p>
+            <input type ="submit" value ="Update Firmware">
+          </p>
+        </form>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

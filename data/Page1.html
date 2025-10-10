@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Didomak</title>
+    <link rel="stylesheet" href="styles1.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+</head>
+<body>
+    <div class="container">
+        <h1 class="loading-text">Didomak Dashboard</h1>
+        <div class="status">
+            <div class="item">
+                <!-- <i class="fas fa-thermometer-half"></i> -->
+                <img src="temp.png" alt="temp Icon", class="icon">
+                <label>Temperature</label>
+                <canvas id="temperature-gauge" width="150" height="150"></canvas>            
+            </div>
+            <div class="item">
+                <!-- <i class="fas fa-water"></i> -->
+                <img src="humidity.png" alt="humidity Icon", class="icon">
+                <label>Humidity</label>
+                <canvas id="humidity-gauge" width="150" height="150"></canvas>            
+            </div>
+            <div class="item">
+                <!-- <i class="fas fa-cloud"></i> -->
+                <img src="cloud.png" alt="cloud Icon", class="icon">
+                <label>CO Sensor</label>
+                <span id="co-sensor">--</span>
+            </div>
+            <div class="item">
+                <!-- <i class="fas fa-fire"></i> -->
+                <img src="fire.png" alt="fire Icon", class="icon">
+                <label>Fire Sensor</label>
+                <span id="fire-sensor">--</span>
+            </div>
+            <div class="item">
+                <!-- <i class="fas fa-user-times"></i> -->
+                <img src="person.png" alt="fire Icon", class="icon">
+                <label>Motion Detection</label>
+                <span id="motion">--</span>
+            </div>
+            <div class="item">
+                <i class="fas fa-tachometer-alt"></i>
+                <label>Pressure</label>
+                <span id="pressure">--</span>
+            </div>
+            <div class="item">
+                <!-- <i class="fas fa-battery-half"></i> -->
+                <img src="battery.png" alt="battery Icon", class="icon">
+                <label>Power/Battery</label>
+                <span id="power-status">--%</span>
+            </div>
+            <div class="item">
+                <!-- <i class="fas fa-sim-card"></i> -->
+                <img src="sim.png" alt="sim Icon", class="icon">
+                <label>SIM Card Credit</label>
+                <span id="sim-credit">--</span>
+            </div>
+            <div class="item">
+                <!-- <i class="fas fa-user-shield"></i> -->
+                <img src="alarm.png" alt="alarm Icon", class="icon">
+                <label>System</label>
+                <label class="switch">
+                    <input type="checkbox" id="system-toggle">
+                    <span class="slider"></span>
+                </label>
+                <span id="system-status">Inactive</span>
+            </div>
+            <div class="item">
+                <!-- <i class="fas fa-lightbulb"></i> -->
+                <img src="lamp.png" alt="lamp Icon", class="icon">
+                <label>Lamp</label>
+                <label class="switch">
+                    <input type="checkbox" id="lamp-toggle">
+                    <span class="slider"></span>
+                </label>
+                <span id="lamp-status">Off</span>
+            </div>
+        </div>
+
+        <footer class="footer">
+            <div class="footer-content">
+                <button class="icon-btn" id="log-btn"><img src="log.png" alt="log icon" class="bicon"></button>
+                <button class="icon-btn" id="clock-btn"><img src="clock.png" alt="clock icon" class="bicon"></button>
+                <button class="icon-btn selected" id="sensors-btn"><img src="home.png" alt="home icon" class="bicon"></button>
+                <button class="icon-btn" id="setting-btn"><img src="setting.png" alt="setting icon" class="bicon"></button>
+                <button class="icon-btn" id="logoutBtn"><img src="logout.png" alt="logout icon" class="bicon"></button>
+
+            </div>
+        </footer>
+        
+    </div>
+    <script src="script1.js"></script>
+</body>
+</html>

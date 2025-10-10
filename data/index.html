@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Home Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.7.2/css/all.css" integrity="sha384-fnmOCqbTlWIlj8LyTjo7mOUStjsKC4pOpQbqyi7RrhN7udi9RwhKkMHpvLbHG9Sr" crossorigin="anonymous">
+</head>
+<body>
+    <div class="header">
+        <img src="alarm.png" alt="Smart Home Logo" class="logo">
+        <h1>Smart Home Dashboard</h1>
+    </div>
+    <div class="container">
+        <div class="card sensor-card">
+            <h2>Sensor Readings</h2>
+            <p><i class="fas fa-thermometer-half"></i> <strong>Temperature:</strong> <span id="temperature">--</span>°C</p>
+            <p><i class="fas fa-tint"></i> <strong>Humidity:</strong> <span id="humidity">--</span>%</p>
+            <p><i class="fas fa-weight-hanging"></i> <strong>Pressure:</strong> <span id="pressure">--</span> hPa</p>
+        </div>
+        <div class="card control-card">
+            <h2>Controls</h2>
+            <div class="toggle-switch">
+                <input type="checkbox" id="system" class="switch-checkbox">
+                <label class="switch-label" for="system"><span class="slider round"></span></label>
+                <span class="control-label">System</span>
+            </div>
+            <div class="toggle-switch">
+                <input type="checkbox" id="lamp" class="switch-checkbox">
+                <label class="switch-label" for="lamp"><span class="slider round"></span></label>
+                <span class="control-label">Lamp</span>
+            </div>
+            <div class="toggle-switch">
+                <input type="checkbox" id="alarm" class="switch-checkbox">
+                <label class="switch-label" for="alarm"><span class="slider round"></span></label>
+                <span class="control-label">Alarm</span>
+            </div>
+            <div class="toggle-switch">
+                <input type="checkbox" id="sms" class="switch-checkbox">
+                <label class="switch-label" for="sms"><span class="slider round"></span></label>
+                <span class="control-label">Send SMS</span>
+            </div>
+        </div>
+        <div class="card phone-card">
+            <h2>Phone Management</h2>
+            <input type="text" id="phone-number" placeholder="09123456789">
+            <button id="save-phone">Save Number</button>
+            <select id="saved-numbers">
+                <option>Saved Numbers</option>
+            </select>
+        </div>
+    </div>
+    <script src="script.js"></script>
+
+    <!-- <script>
+        
+
+    </script> -->
+</body>
+</html>
+
+
