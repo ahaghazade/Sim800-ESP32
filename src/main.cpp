@@ -33,6 +33,8 @@
 #include <AsyncElegantOTA.h>
 #include <ArduinoJson.h>
 #include "ESP32Time.h"
+#include <Adafruit_Sensor.h>
+#include "MQ7.h"
 
 /* Private define ------------------------------------------------------------*/
 #define RX1D1 18
@@ -57,6 +59,15 @@
 
 #define LD2420_PIN 22
 #define Motionthr 3
+//gas
+#define FIREPIN  34         //MQ2
+#define COPIN 35            //MQ7
+#define CALIBARAION_SAMPLE_TIMES     (50)    //define how many samples you are  going to take in the calibration phase
+#define CALIBRATION_SAMPLE_INTERVAL  (500)   //define the time interal(in milisecond) between each samples in the                                                     //cablibration phase
+#define READ_SAMPLE_INTERVAL         (50)    //define how many samples you are  going to take in normal operation
+#define READ_SAMPLE_TIMES            (5)     //define the time interal(in milisecond) between each samples in 
+#define RO_CLEAN_AIR_FACTOR          (9.83)  //RO_CLEAR_AIR_FACTOR=(Sensor resistance in clean air)/RO,
+#define RL_VALUE                     (5) 
 
 #define WIFI_CONNECTION_INTERVAL  10000
 #define SENSOR_CHECK_INTERVAL_MS  2000
@@ -134,13 +145,14 @@ unsigned long PreviousMillisHeartBit = 0;
 //tasks handler
 TaskHandle_t fRGBTaskHandler;
 
-//senosrs
+//time
 static unsigned long previousMilliSensorCheck = 0;
 static int MotionDetection = 0;
 static unsigned long lastAlarmTime;
 static unsigned long lastSensorDoubleCheck;
-
 static unsigned long previousMilliSim800Check = 0;
+//Gas
+MQ7 mq7(COPIN,5.0);
 
 /* Private function prototypes -----------------------------------------------*/
 static void fSim800_CommandHandler(sSim800RecievedMassgeDone *pArgs);
@@ -177,6 +189,8 @@ static void fBuzzer(void);
 static void fRGBTask(void *param);
 static bool fCheckLd2420(void);
 static void fCheckMotion(void);
+static void MQ2Read(int MQ2Pin);
+static void MQ7Read();
 
 /* Variables -----------------------------------------------------------------*/
 
@@ -199,6 +213,8 @@ void setup() {
   pinMode(HEARTBIT_PIN, OUTPUT);
   digitalWrite(RELAY_PIN, LOW);
   ledcAttachPin(fBUZZER_PIN, TONE_PWM_CHANNEL);
+  pinMode(COPIN, INPUT);
+  pinMode(FIREPIN, INPUT);
 
 //------------- init sensros ----------
   if(fLd2420_Init() != LD2420_RES_OK) {
@@ -429,6 +445,11 @@ void loop() {
   if(millis() - previousMilliSensorCheck > SENSOR_CHECK_INTERVAL_MS)
   {
     fCheckMotion();
+    MQ2Read(FIREPIN);
+    MQ7Read();
+    String message;
+    serializeJson(SensorsValueJson, message);
+    fNotifyClients(message);
     previousMilliSensorCheck = millis();
   }
 
@@ -1751,6 +1772,68 @@ static void fCheckMotion(void) {
         Serial.println("Danger!!!!! >> Sending sms...");
         fSim800_SMSSendToAll(DANGER);
         // CreditCheckCounter++;
+    }
+  }
+}
+
+/**
+ * @brief 
+ * 
+ * @param MQ2Pin 
+ */
+void MQ2Read(int MQ2Pin)
+{
+  //esp_task_wdt_reset();
+  int sensorValue = map(analogRead(MQ2Pin), 0, 4095, 0, 255); 
+  delay(100);
+  sensorValue += map(analogRead(MQ2Pin), 0, 4095, 0, 255); 
+  delay(100);
+  sensorValue += map(analogRead(MQ2Pin), 0, 4095, 0, 255); 
+
+  sensorValue = sensorValue / 3;
+  
+  SensorsValueJson["FireSensor"] = sensorValue;
+  Serial.printf("Fire Sensor Value: %d\n", sensorValue);
+
+  if(sensorValue >= systemConfig["Firelimit"].as<int>())
+  {
+    Serial.printf("\nWARNING!!! Fire Sensor(%d) is over than limit %d\n", sensorValue, systemConfig["Firelimit"].as<int>());
+    if ((millis() - lastAlarmTime > systemConfig["AlarmDuration"].as<int>() * 1000) && systemConfig["FireSensorEn"])
+    {
+      String NewLog = "(" + rtc.getDateTime() + ") Warning Fire Sensor Value = " + SensorsValueJson["FireSensor"].as<String>();
+      fSendLog(NewLog);
+      Serial.println("Sending Warning SMS to all contacts");
+      lastAlarmTime = millis();
+      String  fireMessage = FIRE1 + String(sensorValue) + FIRE2;
+      Serial.println(fireMessage);
+      fSim800_SMSSendToAll(fireMessage);
+      // CreditCheckCounter++;
+    }
+  }
+}
+
+/**
+ * @brief 
+ * 
+ */
+void MQ7Read() {
+  int COValue = mq7.getPPM();
+  Serial.printf("\nCo Value = %d\n", COValue);
+  SensorsValueJson["Co"] = COValue;
+  //esp_task_wdt_reset();
+  if(COValue >= systemConfig["Colimit"].as<int>())
+  {
+    Serial.printf("\nWARNING!!! COValue(%d) is over than limit %d\n", COValue, systemConfig["Colimit"].as<int>());
+    if ((millis() - lastAlarmTime > systemConfig["AlarmDuration"].as<int>() * 1000) && systemConfig["CoSensorEn"])
+    {
+      String NewLog = "(" + rtc.getDateTime() + ") Warning Co Value = " + SensorsValueJson["Co"].as<String>();
+      fSendLog(NewLog);
+      Serial.println("Sending Warning SMS to all contacts");
+      lastAlarmTime = millis();
+      String  COMessage = CO1 + String(COValue) + FIRE2;
+      Serial.println(COMessage);
+      fSim800_SMSSendToAll(COMessage);
+      // CreditCheckCounter++;
     }
   }
 }
