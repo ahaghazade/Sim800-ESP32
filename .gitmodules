@@ -1,3 +1,9 @@
 [submodule "lib/sim800_cdrv"]
 	path = lib/sim800_cdrv
 	url = https://github.com/ahaghazade/Sim800_cdrv.git
+[submodule "lib/ws2812_cdrv"]
+	path = lib/ws2812_cdrv
+	url = https://github.com/ahaghazade/ws2812_cdrv.git
+[submodule "lib/ld2420_cdrv"]
+	path = lib/ld2420_cdrv
+	url = https://github.com/ahaghazade/Ld2420_cdrv.git
