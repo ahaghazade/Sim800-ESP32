@@ -47,7 +47,6 @@
 
 #define SERVER_PORT 80
 #define WIFI_CHECKCONNECTION 5
-#define WIFI_CONNECTION_INTERVAL 10000
 
 #define INIT_SPIFF_TRY 3
 
@@ -58,9 +57,14 @@
 
 #define LD2420_PIN 22
 #define Motionthr 3
-#define intervalSensorCheck 2000
-#define SensorDoubleCheckTime 10000
-#define ALARM_INTERVAL_MS 20000
+
+#define WIFI_CONNECTION_INTERVAL  10000
+#define SENSOR_CHECK_INTERVAL_MS  2000
+#define SensorDoubleCheckTime     10000
+#define ALARM_INTERVAL_MS         20000
+#define HEARTBIT_INTERVAL_MS      1000
+#define SIM800_CHECK_INTERVAL_MS  3000
+
 
 /* Private macro -------------------------------------------------------------*/
 /* Private typedef -----------------------------------------------------------*/
@@ -107,7 +111,7 @@ static unsigned long previousMillisWifi = 0;
 static unsigned long prevWIFI_CHECKCONNECTIONTime = 0;
 static const long WIFI_CHECKCONNECTIONInterval = 10000;
 
-//fbuzzer
+//Buzzer
 static const int TONE_PWM_CHANNEL = 0;
 
 //Config Time
@@ -125,6 +129,7 @@ static int day = 1;
 
 //led
 static sWs2812 ws2812;
+unsigned long PreviousMillisHeartBit = 0;
 
 //tasks handler
 TaskHandle_t fRGBTaskHandler;
@@ -134,6 +139,8 @@ static unsigned long previousMilliSensorCheck = 0;
 static int MotionDetection = 0;
 static unsigned long lastAlarmTime;
 static unsigned long lastSensorDoubleCheck;
+
+static unsigned long previousMilliSim800Check = 0;
 
 /* Private function prototypes -----------------------------------------------*/
 static void fSim800_CommandHandler(sSim800RecievedMassgeDone *pArgs);
@@ -269,7 +276,7 @@ void setup() {
 
   fLd2420_ConfigABDParams(SetMaxDistance, systemConfig["RadarDistance"].as<int>()); 
 
-
+  lastAlarmTime  = millis() - systemConfig["AlarmDuration"].as<int>() * 1000; //stop alarm
   digitalWrite(HEARTBIT_PIN, systemConfig["LampStatus"].as<int>());
 
   Serial.println("=====Saved Login Pass=====");
@@ -299,13 +306,14 @@ void setup() {
     ws2812.MainColor = (CRGB)strtol(systemConfig["SystemOffColor"], NULL, 16);
   }
   
-  ws2812.Effect = FillColor;
-  ws2812.Color = CRGB::Black;
-  fWs2812_Run(&ws2812);
+  // ws2812.Effect = FillColor;
+  // ws2812.Color = CRGB::Black;
+  // fWs2812_Run(&ws2812);
   ws2812.Effect = Fancy;
   ws2812.Color = CRGB::Green;
-  fWs2812_Run(&ws2812);
-
+  // fWs2812_Run(&ws2812);
+  xTaskCreatePinnedToCore(fRGBTask, "RGB_Task", 4096, NULL, 2, &fRGBTaskHandler, 1);
+  delay(5000);
 //------------- init wifi and time -------------
   bool GetTimeFlag = false;
 
@@ -342,9 +350,9 @@ void setup() {
 
     ws2812.Effect = LinearFill;
     ws2812.Color = CRGB(76,0,153);
-    fWs2812_Run(&ws2812);
+    // fWs2812_Run(&ws2812);
   }
-  fWs2812_Run(&ws2812);
+  // fWs2812_Run(&ws2812);
 
   if(!GetTimeFlag)
   {
@@ -403,7 +411,6 @@ void setup() {
 
   // fSim800_SMSSendToAll(STARTUP_MSG);
 
-  xTaskCreatePinnedToCore(fRGBTask, "RGB_Task", 4096, NULL, 2, &fRGBTaskHandler, 1);
 }
 
 /*
@@ -413,9 +420,23 @@ void setup() {
 
 void loop() {
 
-  fSim800_Run();
-  fCheckMotion();
-  delay(2000);
+  if(millis() - previousMilliSim800Check > SIM800_CHECK_INTERVAL_MS)
+  {
+    fSim800_Run();
+    previousMilliSim800Check = millis();
+  }
+
+  if(millis() - previousMilliSensorCheck > SENSOR_CHECK_INTERVAL_MS)
+  {
+    fCheckMotion();
+    previousMilliSensorCheck = millis();
+  }
+
+  if(millis() - PreviousMillisHeartBit > HEARTBIT_INTERVAL_MS)
+  {
+    digitalWrite(HEARTBIT_PIN, !digitalRead(HEARTBIT_PIN));
+    PreviousMillisHeartBit = millis();
+  }
 }
 
 /*
@@ -1063,7 +1084,11 @@ static void fLoadJson(const char* filename, JsonDocument& doc) {
  */
 static bool fWiFi_Init(void) {
 
+    Serial.println("+++++++++++++++*");
+
   WiFi.mode(WIFI_STA);
+      Serial.println("===========");
+
   if(passSPIFF == "") {
     WiFi.begin(ssidSPIFF.c_str());
   } else {
@@ -1082,7 +1107,7 @@ static bool fWiFi_Init(void) {
 
     ws2812.Effect = BlinkSmooth;
     ws2812.Color = CRGB::Blue;
-    fWs2812_Run(&ws2812);
+    // fWs2812_Run(&ws2812);
     
     currentMillis = millis();
     if (currentMillis - previousMillisWifi >= WIFI_CONNECTION_INTERVAL) {
@@ -1653,13 +1678,10 @@ static void fRGBTask(void *param) {
 
   while (true) {
 
-    if(ws2812.Effect == BlinkSmooth && ws2812.Color == CRGB::Red) {
-
-      if(millis() - lastAlarmTime < ALARM_INTERVAL_MS) {
-      
-        ws2812.Effect = BlinkSmooth;
-        ws2812.Color = CRGB::Red;
-      }
+    if(millis() - lastAlarmTime < systemConfig["AlarmDuration"].as<int>() * 1000) {
+    
+      ws2812.Effect = BlinkSmooth;
+      ws2812.Color = CRGB::Red;
     }
 
     fWs2812_Run(&ws2812);
@@ -1708,6 +1730,7 @@ static void fCheckMotion(void) {
     // SensorsValueJson["Motion"] = "PIR + MW";
     SensorsValueJson["Motion"] = "Detected";
     Serial.printf("\nWARNING!!! Motion detected[%d]\n", MotionDetection);
+    Serial.println((millis() - lastAlarmTime > systemConfig["AlarmDuration"].as<int>() * 1000));
 
     if((millis() - lastAlarmTime > systemConfig["AlarmDuration"].as<int>() * 1000) && systemConfig["SystemStatus"] && MotionDetection >= Motionthr)
     {
