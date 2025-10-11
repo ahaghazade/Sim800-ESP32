@@ -21,8 +21,10 @@
 #include <Arduino.h>
 
 #include "Sim800_cdrv.h"
-#include <soc/rtc_cntl_reg.h>
+#include "ws2812_cdrv.h"
+#include "ld2420_cdrv.h"
 
+#include <soc/rtc_cntl_reg.h>
 #include <WiFi.h> 
 #include <HTTPClient.h>
 #include <ESPAsyncWebServer.h>
@@ -33,18 +35,32 @@
 #include "ESP32Time.h"
 
 /* Private define ------------------------------------------------------------*/
+#define RX1D1 18
+#define TX1D1 25
+
 #define RX2D2 16
 #define TX2D2 17
 
 #define RELAY_PIN 5
 #define HEARTBIT_PIN 12
-#define BUZZER_PIN 13
+#define fBUZZER_PIN 13
 
 #define SERVER_PORT 80
-#define WifiCheckConnection 5
-#define IntervalWifiConnection 10000
+#define WIFI_CHECKCONNECTION 5
+#define WIFI_CONNECTION_INTERVAL 10000
 
 #define INIT_SPIFF_TRY 3
+
+#define RGB_NUM_LEDS 52
+#define RGB_BRIGHTNESS  10
+#define RGB_FULL_BRIGHTNESS 40
+#define RGB_DATA_PIN 19
+
+#define LD2420_PIN 22
+#define Motionthr 3
+#define intervalSensorCheck 2000
+#define SensorDoubleCheckTime 10000
+#define ALARM_INTERVAL_MS 20000
 
 /* Private macro -------------------------------------------------------------*/
 /* Private typedef -----------------------------------------------------------*/
@@ -88,13 +104,13 @@ static JsonDocument SocketClients;
 static bool WifiConnected = false;
 static volatile int WifiNotConnectedCount = 1;
 static unsigned long previousMillisWifi = 0;
-static unsigned long prevWifiCheckConnectionTime = 0;
-static const long WifiCheckConnectionInterval = 10000;
+static unsigned long prevWIFI_CHECKCONNECTIONTime = 0;
+static const long WIFI_CHECKCONNECTIONInterval = 10000;
 
-//buzzer
+//fbuzzer
 static const int TONE_PWM_CHANNEL = 0;
 
-//---------------- Config Time -----------------
+//Config Time
 static ESP32Time rtc(0);  // offset in seconds GMT+1
 static const char* ntpServer = "pool.ntp.org";
 static const long  gmtOffset_sec = 3.5 * 60 * 60;
@@ -107,27 +123,53 @@ static int year  = 2025;
 static int month = 1;
 static int day = 1;
 
+//led
+static sWs2812 ws2812;
+
+//tasks handler
+TaskHandle_t fRGBTaskHandler;
+
+//senosrs
+static unsigned long previousMilliSensorCheck = 0;
+static int MotionDetection = 0;
+static unsigned long lastAlarmTime;
+static unsigned long lastSensorDoubleCheck;
+
 /* Private function prototypes -----------------------------------------------*/
 static void fSim800_CommandHandler(sSim800RecievedMassgeDone *pArgs);
-static void fCommand_lampAct(const String receivedMessage);
+static void fCommand_SystemAct(const String receivedMessage);
+static void fCommand_IpAct(const String receivedMessage);
+static void fCommand_LampAct(const String receivedMessage);
+static void fCommand_AlarmAct(const String receivedMessage);
+static void fCommand_fireAct(const String receivedMessage);
+static void fCommand_CarbonSensorAct(const String receivedMessage);
+static void fCommand_TempSensorAct(const String receivedMessage);
+static void fCommand_HumiditySensorAct(const String receivedMessage);
 
-static void initWebSocket(void);
-static void handleWebSocketMessage(void *arg, uint8_t *data, size_t len);
-static void notifyClients(String text);
-static void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type,
+static void fInitWebSocket(void);
+static void fHandleWebSocketMessage(void *arg, uint8_t *data, size_t len);
+static void fNotifyClients(String text);
+static void fOnEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type,
              void *arg, uint8_t *data, size_t len);
 
-static void saveJson(const char* filename, JsonDocument& doc);
-static void loadJson(const char* filename, JsonDocument& doc);
+static void fSaveJson(const char* filename, JsonDocument& doc);
+static void fLoadJson(const char* filename, JsonDocument& doc);
 
-static bool initWiFi(void);
-static void StartServers(void);
-static void initSPIFFS(void);
-static void SystemConfigInitial(void);
+static bool fWiFi_Init(void);
+static void fStartServers(void);
+static void fAddLog(String newLog);
+static void fSendLog(String LogMessage);
 
-static void Buzzer(void);
-static void parsePhoneNumbers(JsonDocument& doc);
-static void convertToOriginalFormat(JsonDocument *pPhoneNumbersDoc, JsonDocument *pOriginalDoc);
+static void fInitSPIFFS(void);
+static void fSystemConfigInitial(void);
+
+static void fParsePhoneNumbers(JsonDocument& doc);
+static void fConvertToOriginalFormat(JsonDocument *pPhoneNumbersDoc, JsonDocument *pOriginalDoc);
+
+static void fBuzzer(void);
+static void fRGBTask(void *param);
+static bool fCheckLd2420(void);
+static void fCheckMotion(void);
 
 /* Variables -----------------------------------------------------------------*/
 
@@ -139,7 +181,9 @@ void setup() {
 
 //------------- init serials -------------
   Serial.begin(115200);
+  Serial1.begin(115200, SERIAL_8N1, RX1D1, TX1D1);
   Serial2.begin(115200, SERIAL_8N1, RX2D2, TX2D2);
+
   Serial.println("Power on");
   WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
 
@@ -147,18 +191,25 @@ void setup() {
   pinMode(RELAY_PIN, OUTPUT);
   pinMode(HEARTBIT_PIN, OUTPUT);
   digitalWrite(RELAY_PIN, LOW);
-  ledcAttachPin(BUZZER_PIN, TONE_PWM_CHANNEL);
+  ledcAttachPin(fBUZZER_PIN, TONE_PWM_CHANNEL);
 
+//------------- init sensros ----------
+  if(fLd2420_Init() != LD2420_RES_OK) {
+    Serial.println("fLd2420 init failed!");
+  }
+
+  delay(500);
+  fLd2420_ConfigABDParams(SetDelayTime,2);
 //------------- init spiff -------------
-  initSPIFFS();
+  fInitSPIFFS();
 
-  loadJson(SystemStatusPath, systemConfig);
-  loadJson(LoginPassPath, LoginPass);
+  fLoadJson(SystemStatusPath, systemConfig);
+  fLoadJson(LoginPassPath, LoginPass);
   SystemLog["logs"] = JsonArray();
-  loadJson(LastLogsPath, SystemLog);
-  loadJson(RebootCounterPath, RebootCount);
-  loadJson(WifiConfigPath, WifiConfig);
-  loadJson(TimeJsonDocPath, TimeJsonDoc);
+  fLoadJson(LastLogsPath, SystemLog);
+  fLoadJson(RebootCounterPath, RebootCount);
+  fLoadJson(WifiConfigPath, WifiConfig);
+  fLoadJson(TimeJsonDocPath, TimeJsonDoc);
 
   if(!TimeJsonDoc.containsKey("day"))
   {
@@ -168,18 +219,18 @@ void setup() {
     TimeJsonDoc["day"] = 24;
     TimeJsonDoc["year"] = 2025;
     TimeJsonDoc["month"] = 6;
-    saveJson(TimeJsonDocPath, TimeJsonDoc);
+    fSaveJson(TimeJsonDocPath, TimeJsonDoc);
   }
   
   if(!WifiConfig.containsKey("ssid"))
   {
     WifiConfig["ssid"] = "";
-    saveJson(WifiConfigPath, WifiConfig);
+    fSaveJson(WifiConfigPath, WifiConfig);
   }
   if(!WifiConfig.containsKey("pass"))
   {
     WifiConfig["pass"] = "";
-    saveJson(WifiConfigPath, WifiConfig);
+    fSaveJson(WifiConfigPath, WifiConfig);
   }
 
   ssidSPIFF = WifiConfig["ssid"].as<String>();
@@ -188,23 +239,23 @@ void setup() {
   if(!LoginPass.containsKey("Pass"))
   {
     LoginPass["Pass"] = "pass";
-    saveJson(LoginPassPath, LoginPass);
+    fSaveJson(LoginPassPath, LoginPass);
   }
   else if(LoginPass["Pass"] == "")
   {
     LoginPass["Pass"] = "pass";
-    saveJson(LoginPassPath, LoginPass);
+    fSaveJson(LoginPassPath, LoginPass);
   }
 
   if(!RebootCount.containsKey("Count"))
   {
     RebootCount["Count"] = 1;
-    saveJson(RebootCounterPath, RebootCount);
+    fSaveJson(RebootCounterPath, RebootCount);
   }
   else
   {
     RebootCount["Count"] = RebootCount["Count"].as<int>() + 1;
-    saveJson(RebootCounterPath, RebootCount);
+    fSaveJson(RebootCounterPath, RebootCount);
   }
 
   Serial.println("=====Saved Wifi Config=====");
@@ -214,7 +265,10 @@ void setup() {
   Serial.println("=====Saved systemConfig=====");
   serializeJsonPretty(systemConfig, Serial);
   Serial.println();
-  SystemConfigInitial();
+  fSystemConfigInitial();
+
+  fLd2420_ConfigABDParams(SetMaxDistance, systemConfig["RadarDistance"].as<int>()); 
+
 
   digitalWrite(HEARTBIT_PIN, systemConfig["LampStatus"].as<int>());
 
@@ -226,12 +280,38 @@ void setup() {
   serializeJsonPretty(SystemLog, Serial);
   Serial.println();
 
+//------------- rgb ring -------------
+  ws2812.LedNum = RGB_NUM_LEDS;
+  ws2812.Effect = FillColor;
+  ws2812.BetweanEffectDelayMs = (uint32_t)250;
+  ws2812.Brightness = systemConfig["RgbRing"].as<int>() * RGB_FULL_BRIGHTNESS / 100;
+  ws2812.Init = false;
+  ws2812.DataPin = RGB_DATA_PIN;
+
+  if(fWs2812_Init(&ws2812) != WS2812_RES_OK) {
+
+    Serial.println("ws2812_17 init Failed!!!");
+  }
+
+  if(systemConfig["SystemStatus"].as<bool>()) {
+    ws2812.MainColor = (CRGB)strtol(systemConfig["SystemOnColor"], NULL, 16);
+  } else {
+    ws2812.MainColor = (CRGB)strtol(systemConfig["SystemOffColor"], NULL, 16);
+  }
+  
+  ws2812.Effect = FillColor;
+  ws2812.Color = CRGB::Black;
+  fWs2812_Run(&ws2812);
+  ws2812.Effect = Fancy;
+  ws2812.Color = CRGB::Green;
+  fWs2812_Run(&ws2812);
+
 //------------- init wifi and time -------------
   bool GetTimeFlag = false;
 
   if(ssidSPIFF != "")
   {
-    if(initWiFi()) {
+    if(fWiFi_Init()) {
       Serial.println("WiFi Connected");
       // Init and get the time
       configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
@@ -259,7 +339,13 @@ void setup() {
     IPAddress IP = WiFi.softAPIP();
     Serial.print("AP IP address: ");
     Serial.println(IP);
+
+    ws2812.Effect = LinearFill;
+    ws2812.Color = CRGB(76,0,153);
+    fWs2812_Run(&ws2812);
   }
+  fWs2812_Run(&ws2812);
+
   if(!GetTimeFlag)
   {
     Serial.println("Load time from last connection");
@@ -276,7 +362,7 @@ void setup() {
 
   Serial.println("----------8");
   digitalWrite(HEARTBIT_PIN, LOW);
-  StartServers();
+  fStartServers();
 
   SensorsValueJson["Temperature"] = -1;
   SensorsValueJson["Pressure"]    = -1;
@@ -315,7 +401,9 @@ void setup() {
   serializeJsonPretty(PhoneList, Serial);
   Serial.println();
 
-  fSim800_SMSSendToAll(STARTUP_MSG);
+  // fSim800_SMSSendToAll(STARTUP_MSG);
+
+  xTaskCreatePinnedToCore(fRGBTask, "RGB_Task", 4096, NULL, 2, &fRGBTaskHandler, 1);
 }
 
 /*
@@ -326,6 +414,7 @@ void setup() {
 void loop() {
 
   fSim800_Run();
+  fCheckMotion();
   delay(2000);
 }
 
@@ -347,12 +436,90 @@ static void fSim800_CommandHandler(sSim800RecievedMassgeDone *pArgs) {
   switch(pArgs->CommandType) {
 
     case eSYSTEM_COMMAND: {
+
+      fCommand_SystemAct(pArgs->MassageData.Massage);
+      String readings;
+      serializeJson(systemConfig, readings);
+      fNotifyClients(readings);
+      fSaveJson(SystemStatusPath, systemConfig);
+      fBuzzer();
       break;
     }
 
     case eLAMP_COMMAND: {
 
-      fCommand_lampAct(pArgs->MassageData.Massage);
+      fCommand_LampAct(pArgs->MassageData.Massage);
+      String readings;
+      serializeJson(systemConfig, readings);
+      fNotifyClients(readings);
+      fSaveJson(SystemStatusPath, systemConfig);
+      fBuzzer();
+      break;
+    }
+
+    case eIP_COMMAND: {
+
+      fCommand_IpAct(pArgs->MassageData.Massage);
+      String readings;
+      serializeJson(systemConfig, readings);
+      fNotifyClients(readings);
+      fSaveJson(SystemStatusPath, systemConfig);
+      fBuzzer();
+      break;
+    }
+
+    case eALARM_COMMAND: {
+
+      fCommand_AlarmAct(pArgs->MassageData.Massage);
+      String readings;
+      serializeJson(systemConfig, readings);
+      fNotifyClients(readings);
+      fSaveJson(SystemStatusPath, systemConfig);
+      fBuzzer();
+      break;
+    }
+
+    case eFIRE_COMMAND: {
+
+      fCommand_fireAct(pArgs->MassageData.Massage);
+      String readings;
+      serializeJson(systemConfig, readings);
+      fNotifyClients(readings);
+      fSaveJson(SystemStatusPath, systemConfig);
+      fBuzzer();
+      break;
+    }
+
+    case eMONIXIDE_COMMAND: {
+
+      fCommand_CarbonSensorAct(pArgs->MassageData.Massage);
+      String readings;
+      serializeJson(systemConfig, readings);
+      fNotifyClients(readings);
+      fSaveJson(SystemStatusPath, systemConfig);
+      fBuzzer();
+      break;
+    }
+
+    case eTEMP_COMMAND: {
+
+      fCommand_TempSensorAct(pArgs->MassageData.Massage);
+      String readings;
+      serializeJson(systemConfig, readings);
+      fNotifyClients(readings);
+      fSaveJson(SystemStatusPath, systemConfig);
+      fBuzzer();
+      break;
+    }
+
+    case eHUMIDITY_COMMAND: {
+
+      fCommand_HumiditySensorAct(pArgs->MassageData.Massage);
+      String readings;
+      serializeJson(systemConfig, readings);
+      fNotifyClients(readings);
+      fSaveJson(SystemStatusPath, systemConfig);
+      fBuzzer();
       break;
     }
 
@@ -367,30 +534,179 @@ static void fSim800_CommandHandler(sSim800RecievedMassgeDone *pArgs) {
  * 
  * @param receivedMessage 
  */
-static void fCommand_lampAct(const String receivedMessage) {
+void fCommand_SystemAct(const String receivedMessage) {
+
+  Serial.println("A system command received...");
+  if (receivedMessage.indexOf(OFF) != -1) 
+  {
+    Serial.println("Turning off system...");
+    systemConfig["SystemStatus"] = 0;
+    fSim800_SMSSendToAll(SYSTEMOFF);
+
+  }
+  else if (receivedMessage.indexOf(ON) != -1)
+  {
+    systemConfig["SystemStatus"] = 1;
+    Serial.println("Turning on system!");
+    fSim800_SMSSendToAll(SYSTEMON);
+  }
+}
+
+/**
+ * @brief 
+ * 
+ * @param receivedMessage 
+ */
+void fCommand_IpAct(const String receivedMessage) {
+
+  Serial.println("IP command received.");
+  Serial.println("returning system ip...");
+  String ipString = WiFi.localIP().toString();
+  ipString.replace("." , ",");
+  fSim800_SMSSendToAll("Didomak IP: " + ipString);
+}
+
+
+/**
+ * @brief 
+ * 
+ * @param receivedMessage 
+ */
+static void fCommand_LampAct(const String receivedMessage) {
 
   if (receivedMessage.indexOf(OFF) != -1) {
     Serial.println("Turning off lamp...");
+    systemConfig["LampStatus"] = 0;
     digitalWrite(RELAY_PIN, LOW);
     fSim800_SMSSendToAll(LAMPOFF);
-    // fSim800_SMSSend("09024674437" ,LAMPOFF);
 
   } else if(receivedMessage.indexOf(ON) != -1) {
 
     Serial.println("Turning on lamp!");
+    systemConfig["LampStatus"] = 1;
     digitalWrite(RELAY_PIN, HIGH);
-    // fSim800_SMSSendToAll(&Ssim800, LAMPON);
-    fSim800_SMSSend("09024674437" ,LAMPON);
+    fSim800_SMSSendToAll(LAMPON);
   }
 }
 
-static void initWebSocket(void) {
+/**
+ * @brief 
+ * 
+ * @param receivedMessage 
+ */
+void fCommand_AlarmAct(const String receivedMessage) {
 
-  ws.onEvent(onEvent);
+  Serial.println("A alarm command received...");
+
+  if (receivedMessage.indexOf(OFF) != -1) {
+
+  Serial.println("Turning off alarm!");
+   systemConfig["AlarmStatus"] = 0;
+   fSim800_SMSSendToAll(ALARMOFF); 
+   
+  } else {
+
+    Serial.println("Turning on a alarm!");
+    systemConfig["AlarmStatus"] = 1;
+    fSim800_SMSSendToAll(ALARMON);
+  }
+}
+
+/**
+ * @brief 
+ * 
+ * @param receivedMessage 
+ */
+void fCommand_fireAct(const String receivedMessage) {
+
+  Serial.println("A fire sensore command received...");
+  if(receivedMessage.indexOf(OFF)!=-1) {
+
+    Serial.println("Turning off a fire sensore!");
+    systemConfig["FireSensorEn"] = 0;
+    fSim800_SMSSendToAll(FIREOFF);
+
+  } else {
+
+    Serial.println("Turning on a fire sensore!");
+    systemConfig["FireSensorEn"] = 1;
+    fSim800_SMSSendToAll(FIREON);
+  }
+}
+
+/**
+ * @brief 
+ * 
+ * @param receivedMessage 
+ */
+void fCommand_CarbonSensorAct(const String receivedMessage) {
+
+  Serial.println("A carbon sensore command received...");
+  if(receivedMessage.indexOf(OFF)!=-1) {
+
+    Serial.println("Turning off a carbon sensore!");
+    systemConfig["CoSensorEn"] = 0;
+    fSim800_SMSSendToAll(MOCOFF);
+  } else {
+
+    Serial.println("Turning on a carbon sensore!");
+    systemConfig["CoSensorEn"] = 1;
+    fSim800_SMSSendToAll(MOCON);
+  }
+}
+
+/**
+ * @brief 
+ * 
+ * @param receivedMessage 
+ */
+void fCommand_TempSensorAct(const String receivedMessage) {
+
+  Serial.println("A temp sensore command received...");
+
+  if(receivedMessage.indexOf(OFF)!=-1) {
+
+    Serial.println("Turning off a temp sensore!");
+    systemConfig["TempSensorEn"] = 0;
+    fSim800_SMSSendToAll(TEMPOFF);
+  } else {
+    
+    Serial.println("Turning on a temp sensore!");
+    systemConfig["TempSensorEn"] = 1;
+    fSim800_SMSSendToAll(TEMPON);
+
+  }
+}
+
+/**
+ * @brief 
+ * 
+ * @param receivedMessage 
+ */
+void fCommand_HumiditySensorAct(const String receivedMessage) {
+
+  Serial.println("A humidity sensore command received...");
+  if(receivedMessage.indexOf(OFF)!=-1) {
+
+    Serial.println("Turning off a humidity sensore!");
+    systemConfig["FireSensorEn"] = 0;
+    fSim800_SMSSendToAll(HUMIDITYOFF);
+  } else {
+
+    Serial.println("Turning on a humidity sensore!");
+    systemConfig["FireSensorEn"] = 1;
+    fSim800_SMSSendToAll(HUMIDITYON);
+  }
+}
+
+
+static void fInitWebSocket(void) {
+
+  ws.onEvent(fOnEvent);
   server.addHandler(&ws);
 }
 
-static void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
+static void fHandleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
 
   AwsFrameInfo *info = (AwsFrameInfo*)arg;
   if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
@@ -418,7 +734,10 @@ static void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
       int systemState = doc["System"];
 
 
-      if(systemState == 0) {
+     if(systemState == 0) {
+
+        lastAlarmTime  = millis() - systemConfig["AlarmDuration"].as<int>() * 1000; //stop alarm
+
         fSim800_SMSSendToAll(ALARMOFF);
       } else {
         fSim800_SMSSendToAll(ALARMON);
@@ -430,20 +749,23 @@ static void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
         systemConfig["SystemStatus"] = systemState;
       }
     }
+
     if (doc.containsKey("PhoneNumbers"))
     {
       Serial.print("Phone number added to list: ");
       Serial.println(doc["PhoneNumbers"].as<String>());
       fSim800_RemoveAllPhoneNumbers();
-      parsePhoneNumbers(doc);
+      fParsePhoneNumbers(doc);
       JsonDocument SavedPhoneList;
       JsonDocument OriginalFormatPhoneList;
       fSim800_GetPhoneNumbers(&SavedPhoneList);
-      convertToOriginalFormat(&SavedPhoneList, &OriginalFormatPhoneList);
+      fConvertToOriginalFormat(&SavedPhoneList, &OriginalFormatPhoneList);
       String readings;
       serializeJson(OriginalFormatPhoneList, readings);
-      notifyClients(readings);
+      fNotifyClients(readings);
     }
+
+
     if (doc.containsKey("NewPassword") && doc.containsKey("ConfirmPassword")) {
       String NewPassword = doc["NewPassword"].as<String>();
       String ConfirmPassword = doc["ConfirmPassword"].as<String>();
@@ -456,7 +778,7 @@ static void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
           Serial.println("LoginPass new: ");
           serializeJson(LoginPass, Serial);
           Serial.println();
-          saveJson(LoginPassPath, LoginPass);
+          fSaveJson(LoginPassPath, LoginPass);
         }
         else
         {
@@ -510,6 +832,28 @@ static void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
         }
       }
     }
+    if (doc.containsKey("RadarDistance")) {
+
+      int RadarDistanceState = doc["RadarDistance"].as<int>();
+      Serial.println("RadarDistance State: " + String(RadarDistanceState));
+      fLd2420_ConfigABDParams(SetMaxDistance, RadarDistanceState);
+      if(systemConfig.containsKey("RadarDistance"))
+      {
+        systemConfig["RadarDistance"] = RadarDistanceState;
+      }
+    }
+    if (doc.containsKey("RadarDistanceVariable")) {
+      int RadarDistanceState = doc["RadarDistanceVariable"].as<int>();
+      Serial.println("RadarDistance var set State: " + String(RadarDistanceState));
+    }
+
+    if (doc.containsKey("RgbRingVariable")) {
+      int rgbRingState = doc["RgbRingVariable"].as<int>();
+      Serial.println("rgbRing set State: " + String(rgbRingState));
+
+      ws2812.Brightness = rgbRingState * RGB_FULL_BRIGHTNESS / 100;
+      fWs2812_SetBrightness(&ws2812);
+    }
     if (doc.containsKey("RgbRing")) {
       int rgbRingState = doc["RgbRing"].as<int>();
       Serial.println("rgbRing brightness State: " + String(rgbRingState));
@@ -518,6 +862,7 @@ static void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
         systemConfig["RgbRing"] = rgbRingState;
       }
     }
+
     if (doc.containsKey("AlarmDelay")) {
       if(doc["AlarmDelay"].as<String>() != "") 
       {
@@ -611,16 +956,28 @@ static void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
 
     if (!doc.containsKey("RgbRingVariable") && !doc.containsKey("RadarDistanceVariable")) { //if it isnt rgb slider changing state
 
-      Buzzer();
-      delay(200);
+      fBuzzer();
+
+      if(systemConfig["SystemStatus"].as<bool>()) {
+        ws2812.MainColor = (CRGB)strtol(systemConfig["SystemOnColor"], NULL, 16);
+      } else {
+        ws2812.MainColor = (CRGB)strtol(systemConfig["SystemOffColor"], NULL, 16);
+      }
+
+      ws2812.Brightness = systemConfig["RgbRing"].as<int>() * RGB_FULL_BRIGHTNESS / 100;
+      fWs2812_SetBrightness(&ws2812);
+
+      ws2812.Effect = Blink;
+      ws2812.Color = CRGB::White;
+      ws2812.Brightness = systemConfig["RgbRing"].as<int>() * RGB_FULL_BRIGHTNESS / 100;
       
       Serial.println("New System config: ");
       serializeJsonPretty(systemConfig, Serial);
       Serial.println();
-      saveJson(SystemStatusPath, systemConfig);
+      fSaveJson(SystemStatusPath, systemConfig);
       String readings;
       serializeJson(systemConfig, readings);
-      notifyClients(readings);
+      fNotifyClients(readings);
     }
   }
 }
@@ -630,7 +987,7 @@ static void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
  * 
  * @param text 
  */
-static void notifyClients(String text) {
+static void fNotifyClients(String text) {
   ws.textAll(text);
 }
 
@@ -644,7 +1001,7 @@ static void notifyClients(String text) {
  * @param data 
  * @param len 
  */
-static void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len) {
+static void fOnEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len) {
 
   switch (type) {
     case WS_EVT_CONNECT:
@@ -656,7 +1013,7 @@ static void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEve
       SocketClients[client->id()] = false;
       break;
     case WS_EVT_DATA:
-      handleWebSocketMessage(arg, data, len);
+      fHandleWebSocketMessage(arg, data, len);
       break;
     case WS_EVT_PONG:
     case WS_EVT_ERROR:
@@ -670,7 +1027,7 @@ static void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEve
  * @param filename 
  * @param doc 
  */
-static void saveJson(const char* filename, JsonDocument& doc) {
+static void fSaveJson(const char* filename, JsonDocument& doc) {
 
    File file = SPIFFS.open(filename, FILE_WRITE);
   if (!file) {
@@ -687,7 +1044,7 @@ static void saveJson(const char* filename, JsonDocument& doc) {
  * @param filename 
  * @param doc 
  */
-static void loadJson(const char* filename, JsonDocument& doc) {
+static void fLoadJson(const char* filename, JsonDocument& doc) {
 
   File file = SPIFFS.open(filename, FILE_READ);
   if (!file) {
@@ -704,13 +1061,14 @@ static void loadJson(const char* filename, JsonDocument& doc) {
  * @return true 
  * @return false 
  */
-static bool initWiFi(void) {
+static bool fWiFi_Init(void) {
 
   WiFi.mode(WIFI_STA);
-  if(passSPIFF == "")
+  if(passSPIFF == "") {
     WiFi.begin(ssidSPIFF.c_str());
-  else
+  } else {
     WiFi.begin(ssidSPIFF.c_str(), passSPIFF.c_str());
+  }
   // WiFi.begin(SSIDWifi.c_str(), PASSWifi.c_str());
   Serial.print("Connecting to WiFi ");
   Serial.print(ssidSPIFF);
@@ -722,8 +1080,12 @@ static bool initWiFi(void) {
     //esp_task_wdt_reset();
     digitalWrite(HEARTBIT_PIN, !digitalRead(HEARTBIT_PIN));
 
+    ws2812.Effect = BlinkSmooth;
+    ws2812.Color = CRGB::Blue;
+    fWs2812_Run(&ws2812);
+    
     currentMillis = millis();
-    if (currentMillis - previousMillisWifi >= IntervalWifiConnection) {
+    if (currentMillis - previousMillisWifi >= WIFI_CONNECTION_INTERVAL) {
       Serial.println("Failed to connect.");
       return false;
     }
@@ -737,6 +1099,9 @@ static bool initWiFi(void) {
   String ipString = WiFi.localIP().toString();
   Serial.println(ipString);
   WifiConnected = true;
+
+  ws2812.Effect = LinearFill;
+  
   return true;
 }
 
@@ -744,9 +1109,9 @@ static bool initWiFi(void) {
  * @brief 
  * 
  */
-static void StartServers(void) {
+static void fStartServers(void) {
 
-  initWebSocket();
+  fInitWebSocket();
   //#################################################
 
   // // Web Server Root URL
@@ -768,7 +1133,7 @@ static void StartServers(void) {
         digitalWrite(HEARTBIT_PIN, lampState);
         // Save to systemConfig
         systemConfig["LampStatus"] = lampState;
-        saveJson(SystemStatusPath, systemConfig);
+        fSaveJson(SystemStatusPath, systemConfig);
 
         // Prepare response
         DynamicJsonDocument resp(128);
@@ -804,7 +1169,7 @@ static void StartServers(void) {
           Serial.println(ssidSPIFF);
           // Write file to save value
           WifiConfig["ssid"] = ssidSPIFF;
-          saveJson(WifiConfigPath, WifiConfig);
+          fSaveJson(WifiConfigPath, WifiConfig);
         }
         // HTTP POST pass value
         if (p->name() == PARAM_INPUT_2) {
@@ -812,7 +1177,7 @@ static void StartServers(void) {
           Serial.print("Password set to: ");
           Serial.println(passSPIFF);
           WifiConfig["pass"] = passSPIFF;
-          saveJson(WifiConfigPath, WifiConfig);
+          fSaveJson(WifiConfigPath, WifiConfig);
         }
       }
     }
@@ -820,7 +1185,7 @@ static void StartServers(void) {
     delay(1000);
     if(ssidSPIFF != "")
     {
-      initWiFi(); 
+      fWiFi_Init(); 
     }
     if(!WifiConnected) 
     {
@@ -977,13 +1342,13 @@ static void StartServers(void) {
     JsonDocument SavedPhoneList;
     JsonDocument OriginalFormatPhoneList;
     fSim800_GetPhoneNumbers(&SavedPhoneList);
-    convertToOriginalFormat(&SavedPhoneList, &OriginalFormatPhoneList);
+    fConvertToOriginalFormat(&SavedPhoneList, &OriginalFormatPhoneList);
     serializeJson(OriginalFormatPhoneList , output); // Serialize the JSON document to a String
     request->send(200, "application/json", output); // Send the serialized String
   });
 
   server.on("/LogNum", HTTP_GET, [](AsyncWebServerRequest *request){
-    loadJson(SystemStatusPath, systemConfig);
+    fLoadJson(SystemStatusPath, systemConfig);
     Serial.println("LogNum Req:");
     serializeJsonPretty(systemConfig, Serial);
     Serial.println();
@@ -997,7 +1362,7 @@ static void StartServers(void) {
   });
 
   server.on("/SystemState", HTTP_GET, [](AsyncWebServerRequest *request){
-    loadJson(SystemStatusPath, systemConfig);
+    fLoadJson(SystemStatusPath, systemConfig);
     Serial.println("systemConfig req:");
     serializeJsonPretty(systemConfig, Serial);
     Serial.println();
@@ -1007,7 +1372,7 @@ static void StartServers(void) {
   });
 
   server.on("/auth", HTTP_POST, [](AsyncWebServerRequest *request){
-    loadJson(LoginPassPath, LoginPass);
+    fLoadJson(LoginPassPath, LoginPass);
     Serial.println("LoginPass:");
     serializeJsonPretty(LoginPass, Serial);
     Serial.println();
@@ -1043,14 +1408,14 @@ static void StartServers(void) {
   });
 
   server.on("/getlogs", HTTP_GET, [](AsyncWebServerRequest *request) {
-        loadJson(LastLogsPath, RebootCount);
+        fLoadJson(LastLogsPath, RebootCount);
         String jsonResponse;
         serializeJson(SystemLog, jsonResponse); // Serialize JSON document to a String
         request->send(200, "application/json", jsonResponse); // Send JSON response
   });
 
   server.on("/boot", HTTP_GET, [](AsyncWebServerRequest *request) {
-        loadJson(RebootCounterPath, RebootCount);
+        fLoadJson(RebootCounterPath, RebootCount);
         String jsonResponse;
         serializeJson(RebootCount, jsonResponse); // Serialize JSON document to a String
         request->send(200, "application/json", jsonResponse); // Send JSON response
@@ -1079,8 +1444,37 @@ static void StartServers(void) {
 /**
  * @brief 
  * 
+ * @param newLog 
  */
-static void initSPIFFS(void) {
+static void fAddLog(String newLog) {
+
+  while (SystemLog["logs"].size() > systemConfig["LogCount"].as<int>()) {
+      SystemLog["logs"].remove(0); // Remove the oldest log if we exceed maxLogs
+  }
+  SystemLog["logs"].add(newLog); // Add the new log to the end
+}
+
+/**
+ * @brief 
+ * 
+ * @param LogMessage 
+ */
+static void fSendLog(String LogMessage) {
+
+  JsonDocument Log;
+  fAddLog(LogMessage);
+  Log["Log"] = LogMessage;
+  String LogString;
+  serializeJson(Log, LogString);
+  fNotifyClients(LogString);
+  fSaveJson(LastLogsPath ,SystemLog);
+}
+
+/**
+ * @brief 
+ * 
+ */
+static void fInitSPIFFS(void) {
 
   int Try = 0;
   bool MountSuccess = false;
@@ -1111,7 +1505,7 @@ static void initSPIFFS(void) {
  * @brief 
  * 
  */
-static void SystemConfigInitial(void) {
+static void fSystemConfigInitial(void) {
 
   if(!systemConfig.containsKey("SystemStatus")  || !systemConfig.containsKey("LampStatus") || !systemConfig.containsKey("AlarmStatus") ||
      !systemConfig.containsKey("TempSensorEn")  || !systemConfig.containsKey("HumiditySensorEn") || !systemConfig.containsKey("AcStatus") ||
@@ -1144,7 +1538,7 @@ static void SystemConfigInitial(void) {
     systemConfig["SystemOffColor"] = "FF8C00";
     systemConfig["AlarmColor"]     = "FF0000";
     systemConfig["AcStatus"]       = false;
-    saveJson(SystemStatusPath, systemConfig);
+    fSaveJson(SystemStatusPath, systemConfig);
   }
   else
   {
@@ -1157,24 +1551,9 @@ static void SystemConfigInitial(void) {
 /**
  * @brief 
  * 
- */
-static void Buzzer(void) {
-
-  ledcWriteTone(TONE_PWM_CHANNEL, 500);
-  delay(100);    
-  ledcWrite(TONE_PWM_CHANNEL, 0); 
-  delay(50);
-  ledcWriteTone(TONE_PWM_CHANNEL, 1000);
-  delay(80);    
-  ledcWrite(TONE_PWM_CHANNEL, 0);
-}
-
-/**
- * @brief 
- * 
  * @param doc 
  */
-static void parsePhoneNumbers(JsonDocument& doc) {
+static void fParsePhoneNumbers(JsonDocument& doc) {
 
   Serial.println("Parsing phone numbers list");
   bool ContainPhoneNum = false;
@@ -1219,7 +1598,7 @@ static void parsePhoneNumbers(JsonDocument& doc) {
  * @param pPhoneNumbersDoc 
  * @param pOriginalDoc 
  */
-static void convertToOriginalFormat(JsonDocument *pPhoneNumbersDoc, JsonDocument *pOriginalDoc) {
+static void fConvertToOriginalFormat(JsonDocument *pPhoneNumbersDoc, JsonDocument *pOriginalDoc) {
 
   int SavedPhoneCount = 0;
 
@@ -1246,6 +1625,111 @@ static void convertToOriginalFormat(JsonDocument *pPhoneNumbersDoc, JsonDocument
 
   // Debug print
   serializeJsonPretty(*pOriginalDoc, Serial);
+}
+
+/**
+ * @brief 
+ * 
+ */
+static void fBuzzer(void) {
+
+  ledcWriteTone(TONE_PWM_CHANNEL, 500);
+  delay(100);    
+  ledcWrite(TONE_PWM_CHANNEL, 0); 
+  delay(50);
+  ledcWriteTone(TONE_PWM_CHANNEL, 1000);
+  delay(80);    
+  ledcWrite(TONE_PWM_CHANNEL, 0);
+}
+
+/**
+ * @brief 
+ * 
+ * @param param 
+ */
+static void fRGBTask(void *param) {
+
+  Serial.println("RGB task started");
+
+  while (true) {
+
+    if(ws2812.Effect == BlinkSmooth && ws2812.Color == CRGB::Red) {
+
+      if(millis() - lastAlarmTime < ALARM_INTERVAL_MS) {
+      
+        ws2812.Effect = BlinkSmooth;
+        ws2812.Color = CRGB::Red;
+      }
+    }
+
+    fWs2812_Run(&ws2812);
+
+    vTaskDelay(pdMS_TO_TICKS(200));
+  }
+}
+
+/**
+ * @brief 
+ * 
+ * @return true 
+ * @return false 
+ */
+static bool fCheckLd2420(void) {
+
+  int ld2420State = digitalRead(LD2420_PIN);
+  if (ld2420State == HIGH) {
+
+    Serial.printf("[MW] Motion Detected!\n");
+    return true;
+  } else {
+    return false;
+  }
+}
+
+/**
+ * @brief 
+ * 
+ */
+static void fCheckMotion(void) {
+
+  if(millis() - lastSensorDoubleCheck > SensorDoubleCheckTime) // reset sensor timer 
+  {
+    MotionDetection = 0;
+    Serial.println("<><><><><><><><><> Resetting Motion Detection <><><><><><><><>");
+  }
+  bool ld2420State = fCheckLd2420();
+  if(!ld2420State)
+    SensorsValueJson["Motion"] = "--";
+  if(ld2420State)
+  {
+    MotionDetection++;
+    lastSensorDoubleCheck = millis();
+    
+    // SensorsValueJson["Motion"] = "PIR + MW";
+    SensorsValueJson["Motion"] = "Detected";
+    Serial.printf("\nWARNING!!! Motion detected[%d]\n", MotionDetection);
+
+    if((millis() - lastAlarmTime > systemConfig["AlarmDuration"].as<int>() * 1000) && systemConfig["SystemStatus"] && MotionDetection >= Motionthr)
+    {
+        MotionDetection = 0;
+        lastSensorDoubleCheck = millis();
+        lastAlarmTime = millis();
+        delay(20);
+
+        while(ws2812.IsUpdating) {
+          delay(20);
+        }
+        ws2812.Color = CRGB::Red;
+        ws2812.Effect = BlinkSmooth;
+
+        String NewLog = "(" + rtc.getDateTime() + ") Motion Detected!";
+        fSendLog(NewLog);
+
+        Serial.println("Danger!!!!! >> Sending sms...");
+        fSim800_SMSSendToAll(DANGER);
+        // CreditCheckCounter++;
+    }
+  }
 }
 
 /************************ Copyright (c) 2025 DiodeGroup *****END OF FILE****/
